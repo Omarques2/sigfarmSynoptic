@@ -13,6 +13,7 @@ import DataViewCategorical = powerbi.DataViewCategorical;
 
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import ISelectionId = powerbi.extensibility.ISelectionId;
+import IVisualEventService = powerbi.extensibility.IVisualEventService;
 
 import VisualObjectInstance = powerbi.VisualObjectInstance;
 import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInstancesOptions;
@@ -20,7 +21,8 @@ import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInst
 import powerbiVisualsApi from "powerbi-visuals-api";
 import VisualEnumerationInstanceKinds = powerbiVisualsApi.VisualEnumerationInstanceKinds;
 
-import { VisualSettings, SvgSettings } from "./settings";
+import { FormattingSettingsService } from "powerbi-visuals-utils-formattingmodel";
+import { VisualSettings, SvgSettings, VisualFormattingSettingsModel } from "./settings";
 
 // ===== helpers =====
 function norm(raw: any): string {
@@ -30,16 +32,6 @@ function norm(raw: any): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
-}
-
-function escapeHtml(v: any): string {
-  const s = String(v ?? "");
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
 
 type ValueField = { label: string; value: any };
@@ -52,6 +44,66 @@ type CatRow = {
   idx: number;
   matchedColor: string; // já com formatação condicional aplicada (se houver)
 };
+
+function buildTooltipContent(title: string, fields: ValueField[]): HTMLDivElement {
+  const wrapper = document.createElement("div");
+
+  const titleEl = document.createElement("div");
+  Object.assign(titleEl.style, {
+    fontWeight: "800",
+    marginBottom: "10px",
+    fontSize: "18px"
+  } as CSSStyleDeclaration);
+  titleEl.textContent = title;
+  wrapper.appendChild(titleEl);
+
+  const rows = fields.filter((f) => f.value !== null && f.value !== undefined && f.value !== "");
+  if (rows.length === 0) {
+    const empty = document.createElement("div");
+    empty.style.opacity = ".7";
+    empty.textContent = "(sem valores)";
+    wrapper.appendChild(empty);
+    return wrapper;
+  }
+
+  for (const field of rows) {
+    const row = document.createElement("div");
+    Object.assign(row.style, {
+      display: "grid",
+      gridTemplateColumns: "max-content 12px minmax(0, 1fr)",
+      alignItems: "start",
+      margin: "3px 0",
+      columnGap: "0"
+    } as CSSStyleDeclaration);
+
+    const label = document.createElement("div");
+    label.style.textAlign = "right";
+    label.style.color = "#444";
+    label.textContent = field.label;
+
+    const spacer = document.createElement("div");
+
+    const valueEl = document.createElement("div");
+    Object.assign(valueEl.style, {
+      textAlign: "left",
+      fontWeight: "600",
+      minWidth: "0",
+      whiteSpace: "normal",
+      overflowWrap: "anywhere",
+      wordBreak: "break-word"
+    } as CSSStyleDeclaration);
+    const raw =
+      typeof field.value === "number" && isFinite(field.value) ? field.value.toLocaleString() : String(field.value);
+    valueEl.textContent = raw;
+
+    row.appendChild(label);
+    row.appendChild(spacer);
+    row.appendChild(valueEl);
+    wrapper.appendChild(row);
+  }
+
+  return wrapper;
+}
 
 // --- cor/contraste ---
 function hexToRgb(hex: string | null | undefined): { r: number; g: number; b: number } | null {
@@ -163,48 +215,6 @@ function makeTooltipHost(container: HTMLElement): HTMLDivElement {
   return tip;
 }
 
-function formatTooltipHTML(title: string, fields: ValueField[]): string {
-  const safeTitle = escapeHtml(title);
-
-  const rows = fields
-    .filter((f) => f.value !== null && f.value !== undefined && f.value !== "")
-    .map((f) => {
-      const label = escapeHtml(f.label);
-      const raw =
-        typeof f.value === "number" && isFinite(f.value)
-          ? f.value.toLocaleString()
-          : String(f.value);
-      const value = escapeHtml(raw);
-
-      // grid com minmax(0,1fr) para permitir wrap do valor sem estourar o card
-      return `
-        <div style="
-          display:grid;
-          grid-template-columns:max-content 12px minmax(0, 1fr);
-          align-items:start;
-          margin:3px 0;
-          column-gap:0;
-        ">
-          <div style="text-align:right;color:#444;">${label}</div>
-          <div></div>
-          <div style="
-            text-align:left;
-            font-weight:600;
-            min-width:0;
-            white-space:normal;
-            overflow-wrap:anywhere;
-            word-break:break-word;
-          ">${value}</div>
-        </div>`;
-    })
-    .join("");
-
-  return `
-    <div style="font-weight:800;margin-bottom:10px;font-size:18px">${safeTitle}</div>
-    ${rows || `<div style="opacity:.7">(sem valores)</div>`}
-  `;
-}
-
 // --- Data URI utils ---
 function decodeSvgDataUri(s: string): string {
   try {
@@ -216,8 +226,8 @@ function decodeSvgDataUri(s: string): string {
 
     if (meta.includes(";base64")) {
       const decoded = atob(data);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return decodeURIComponent((window as any).escape ? (window as any).escape(decoded) : decoded);
+      const win = window as Window & { escape?: (value: string) => string };
+      return decodeURIComponent(win.escape ? win.escape(decoded) : decoded);
     }
     return decodeURIComponent(data);
   } catch {
@@ -251,6 +261,8 @@ export class Visual implements IVisual {
 
   private selectionManager: ISelectionManager | null = null;
   private settings: VisualSettings = new VisualSettings();
+  private formattingSettingsService: FormattingSettingsService;
+  private formattingSettingsModel: VisualFormattingSettingsModel;
 
   private dataMap: Map<string, CatRow> = new Map();
 
@@ -283,6 +295,10 @@ export class Visual implements IVisual {
     this.container = options.element;
 
     this.hostEnv = (this.host as any)?.hostEnv as number | undefined;
+    const localizationManager =
+      (this.host as any)?.createLocalizationManager ? (this.host as any).createLocalizationManager() : undefined;
+    this.formattingSettingsService = new FormattingSettingsService(localizationManager);
+    this.formattingSettingsModel = new VisualFormattingSettingsModel();
 
     this.selectionManager = (this.host as any)?.createSelectionManager
       ? (this.host as any).createSelectionManager()
@@ -334,7 +350,9 @@ export class Visual implements IVisual {
   }
 
   private showTooltip(row: CatRow, ev: MouseEvent) {
-    this.tooltipEl.innerHTML = formatTooltipHTML(row.rawKey, row.fields);
+    const content = buildTooltipContent(row.rawKey, row.fields);
+    this.tooltipEl.textContent = "";
+    this.tooltipEl.appendChild(content);
     this.tooltipEl.style.display = "block";
     this.tooltipVisible = true;
     this.positionTooltip(ev.clientX, ev.clientY);
@@ -394,10 +412,19 @@ export class Visual implements IVisual {
     } as CSSStyleDeclaration);
 
     const ctaText = document.createElement("div");
-    ctaText.innerHTML = `
-      <div style="font-weight:700;">SVG não configurado</div>
-      <div style="opacity:.9;font-size:12px">Clique em “Trocar SVG” para selecionar um arquivo .svg</div>
-    `;
+    const ctaTitle = document.createElement("div");
+    ctaTitle.style.fontWeight = "700";
+    ctaTitle.textContent = "SVG nao configurado";
+
+    const ctaSubtitle = document.createElement("div");
+    Object.assign(ctaSubtitle.style, {
+      opacity: ".9",
+      fontSize: "12px"
+    } as CSSStyleDeclaration);
+    ctaSubtitle.textContent = 'Clique em "Trocar SVG" para selecionar um arquivo .svg';
+
+    ctaText.appendChild(ctaTitle);
+    ctaText.appendChild(ctaSubtitle);
     this.uploadCta.appendChild(ctaText);
     this.container.appendChild(this.uploadCta);
 
@@ -478,14 +505,33 @@ export class Visual implements IVisual {
       fontFamily: "Segoe UI, -apple-system, Roboto, Arial, sans-serif"
     } as CSSStyleDeclaration);
 
-    msg.innerHTML = `
-      <div style="max-width:520px">
-        <div style="font-weight:800;font-size:16px;margin-bottom:6px">SVG não configurado</div>
-        <div style="opacity:.85;font-size:13px;line-height:1.35">
-          Abra o relatório no <b>Power BI Desktop</b> para selecionar/configurar o SVG deste visual.
-        </div>
-      </div>
-    `;
+    const msgBody = document.createElement("div");
+    msgBody.style.maxWidth = "520px";
+
+    const msgTitle = document.createElement("div");
+    Object.assign(msgTitle.style, {
+      fontWeight: "800",
+      fontSize: "16px",
+      marginBottom: "6px"
+    } as CSSStyleDeclaration);
+    msgTitle.textContent = "SVG nao configurado";
+
+    const msgText = document.createElement("div");
+    Object.assign(msgText.style, {
+      opacity: ".85",
+      fontSize: "13px",
+      lineHeight: "1.35"
+    } as CSSStyleDeclaration);
+    msgText.appendChild(document.createTextNode("Abra o relatorio no "));
+    const msgStrong = document.createElement("span");
+    msgStrong.style.fontWeight = "700";
+    msgStrong.textContent = "Power BI Desktop";
+    msgText.appendChild(msgStrong);
+    msgText.appendChild(document.createTextNode(" para selecionar/configurar o SVG deste visual."));
+
+    msgBody.appendChild(msgTitle);
+    msgBody.appendChild(msgText);
+    msg.appendChild(msgBody);
     this.container.appendChild(msg);
   }
 
@@ -531,24 +577,42 @@ export class Visual implements IVisual {
 
   // ===== IVisual =====
   public update(options: VisualUpdateOptions) {
-    const dv = options?.dataViews?.[0];
-    this.settings = VisualSettings.parse(dv);
+    const eventService = (this.host as any)?.eventService as IVisualEventService | undefined;
+    eventService?.renderingStarted(options);
 
-    const svgText = (this.settings.svgSettings.svgText || "").trim();
-    const hasSvg = svgText.length > 0;
+    let succeeded = false;
+    try {
+      const dv = options?.dataViews?.[0];
+      this.formattingSettingsModel = dv
+        ? this.formattingSettingsService.populateFormattingSettingsModel(VisualFormattingSettingsModel, dv)
+        : new VisualFormattingSettingsModel();
+      this.settings = VisualSettings.parse(dv);
 
-    this.setUploadUIVisibility(hasSvg);
+      const svgText = (this.settings.svgSettings.svgText || "").trim();
+      const hasSvg = svgText.length > 0;
 
-    if (!hasSvg) {
-      if (this.canShowSvgPickerUI()) {
-        this.clearSvg();
-        return;
+      this.setUploadUIVisibility(hasSvg);
+
+      if (!hasSvg) {
+        if (this.canShowSvgPickerUI()) {
+          this.clearSvg();
+        } else {
+          this.showNoSvgMessageOutsideDesktop();
+        }
+      } else {
+        this.render(svgText, dv);
       }
-      this.showNoSvgMessageOutsideDesktop();
-      return;
-    }
 
-    this.render(svgText, dv);
+      succeeded = true;
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "Unknown error";
+      eventService?.renderingFailed(options, reason);
+      throw err;
+    } finally {
+      if (succeeded) {
+        eventService?.renderingFinished(options);
+      }
+    }
   }
 
   public enumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions): VisualObjectInstance[] {
@@ -597,6 +661,10 @@ export class Visual implements IVisual {
     }
 
     return instances;
+  }
+
+  public getFormattingModel(): powerbi.visuals.FormattingModel {
+    return this.formattingSettingsService.buildFormattingModel(this.formattingSettingsModel);
   }
 
   // ===== data parse =====

@@ -2,6 +2,7 @@
 "use strict";
 
 import powerbi from "powerbi-visuals-api";
+import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
 import DataView = powerbi.DataView;
 
 type Obj = Record<string, unknown>;
@@ -102,4 +103,115 @@ export class VisualSettings {
 
     return s;
   }
+}
+
+export class AreaFormattingCard extends formattingSettings.SimpleCard {
+  public name: string = "area";
+  public displayName: string = "Area";
+
+  public unmatchedFill = new formattingSettings.ColorPicker({
+    name: "unmatchedFill",
+    displayName: "Unmatched fill",
+    value: { value: "#D3D3D3" }
+  });
+
+  public matchedFill = new formattingSettings.ColorPicker({
+    name: "matchedFill",
+    displayName: "Matched fill",
+    value: { value: "#4CAF50" },
+    instanceKind: powerbi.VisualEnumerationInstanceKinds.ConstantOrRule
+  });
+
+  public slices = [this.unmatchedFill, this.matchedFill];
+}
+
+export class SvgFormattingCard extends formattingSettings.SimpleCard {
+  public name: string = "svgSettings";
+  public displayName: string = "SVG";
+
+  public svgText = new formattingSettings.TextArea({
+    name: "svgText",
+    displayName: "SVG text",
+    placeholder: "Paste SVG text or data URI",
+    value: ""
+  });
+
+  public defaultFill = new formattingSettings.ColorPicker({
+    name: "defaultFill",
+    displayName: "Default fill",
+    value: { value: "#D3D3D3" }
+  });
+
+  public labelShow = new formattingSettings.ToggleSwitch({
+    name: "labelShow",
+    displayName: "Show labels",
+    value: true
+  });
+
+  public labelMin = new formattingSettings.NumUpDown({
+    name: "labelMin",
+    displayName: "Label min size (px)",
+    value: 9
+  });
+
+  public labelMax = new formattingSettings.NumUpDown({
+    name: "labelMax",
+    displayName: "Label max size (px)",
+    value: 26
+  });
+
+  public labelBold = new formattingSettings.ToggleSwitch({
+    name: "labelBold",
+    displayName: "Bold labels",
+    value: true
+  });
+
+  public labelOutlineFactor = new formattingSettings.NumUpDown({
+    name: "labelOutlineFactor",
+    displayName: "Outline factor",
+    value: 0.12
+  });
+
+  public slices = [
+    this.svgText,
+    this.defaultFill,
+    this.labelShow,
+    this.labelMin,
+    this.labelMax,
+    this.labelBold,
+    this.labelOutlineFactor
+  ];
+}
+
+export class OutlineFormattingCard extends formattingSettings.SimpleCard {
+  public name: string = "outline";
+  public displayName: string = "Outline";
+
+  public show = new formattingSettings.ToggleSwitch({
+    name: "show",
+    displayName: "Show",
+    value: false
+  });
+
+  public color = new formattingSettings.ColorPicker({
+    name: "color",
+    displayName: "Color",
+    value: { value: "#000000" }
+  });
+
+  public width = new formattingSettings.NumUpDown({
+    name: "width",
+    displayName: "Width (px)",
+    value: 1
+  });
+
+  public slices = [this.show, this.color, this.width];
+}
+
+export class VisualFormattingSettingsModel extends formattingSettings.Model {
+  public area = new AreaFormattingCard();
+  public svgSettings = new SvgFormattingCard();
+  public outline = new OutlineFormattingCard();
+
+  public cards = [this.area, this.svgSettings, this.outline];
 }
