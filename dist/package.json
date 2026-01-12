@@ -1,0 +1,17 @@
+{
+		"version": "1.0.0.0",
+		"author": {"name":"Sigfarm","email":"seu-email@dominio.com"},
+		"resources": [
+			{
+				"resourceId": "rId0",
+				"sourceType": 5,
+				"file": "resources/SynopticPanelE2B5B9B6B0B14B8C8B0E6C0A7D6A1F01.pbiviz.json"
+			}
+		],
+		"visual": {"name":"SynopticPanel","displayName":"Synoptic Panel","guid":"SynopticPanelE2B5B9B6B0B14B8C8B0E6C0A7D6A1F01","visualClassName":"Visual","version":"1.0.0.0","description":"Painel sinótico em SVG com coloração condicional, rótulos de valor, seleção, zoom/pan e tooltip.","supportUrl":"https://example.com/suporte","gitHubUrl":"https://github.com/seu-repo"},
+		"metadata": {
+			"pbivizjson": {
+				"resourceId": "rId0"
+			}
+		}
+	}

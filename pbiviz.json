@@ -1,0 +1,23 @@
+{
+  "visual": {
+    "name": "SynopticPanel",
+    "displayName": "Synoptic Panel",
+    "guid": "SynopticPanelE2B5B9B6B0B14B8C8B0E6C0A7D6A1F01",
+    "visualClassName": "Visual",
+    "version": "1.0.0.0",
+    "description": "Painel sinótico em SVG com coloração condicional, rótulos de valor, seleção, zoom/pan e tooltip.",
+    "supportUrl": "https://www.sigfarmintelligence.com/pt-br/contact",
+    "gitHubUrl": "https://github.com/seu-repo"
+  },
+  "apiVersion": "5.3.0",
+  "author": {
+    "name": "Sigfarm",
+    "email": "seu-email@dominio.com"
+  },
+  "assets": {
+    "icon": "assets/icon.png"
+  },
+  "style": "style/visual.less",
+  "capabilities": "capabilities.json",
+  "externalJS": []
+}

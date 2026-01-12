@@ -1,0 +1,65 @@
+{
+  "dataRoles": [
+    { "displayName": "Região (ID do SVG)", "name": "category", "kind": "Grouping" },
+    { "displayName": "Valor", "name": "measure", "kind": "Measure" },
+    { "displayName": "Tooltips", "name": "tooltips", "kind": "Measure" }
+  ],
+  "dataViewMappings": [
+    {
+      "categorical": {
+        "categories": {
+          "for": { "in": "category" },
+          "dataReductionAlgorithm": { "top": {} }
+        },
+        "values": {
+          "select": [
+            { "bind": { "to": "measure" } },
+            { "bind": { "to": "tooltips" } }
+          ]
+        }
+      }
+    }
+  ],
+  "objects": {
+    "area": {
+      "displayName": "Area",
+      "properties": {
+        "unmatchedFill": {
+          "displayName": "Cor (sem correspondência)",
+          "type": { "fill": { "solid": { "color": true } } }
+        },
+        "matchedFill": {
+          "displayName": "Cor das áreas (condicional)",
+          "type": { "fill": { "solid": { "color": true } } }
+        }
+      }
+    },
+    "svgSettings": {
+      "displayName": "SVG",
+      "properties": {
+        "svgText": { "displayName": "Conteúdo SVG (texto/Data URI)", "type": { "text": true } },
+        "defaultFill": { "displayName": "Cor padrão (legado)", "type": { "fill": { "solid": { "color": true } } } },
+
+        "labelShow": { "displayName": "Mostrar rótulos (Valor)", "type": { "bool": true } },
+        "labelMin": { "displayName": "Tamanho mínimo (px)", "type": { "numeric": true } },
+        "labelMax": { "displayName": "Tamanho máximo (px)", "type": { "numeric": true } },
+        "labelBold": { "displayName": "Negrito", "type": { "bool": true } },
+        "labelOutlineFactor": { "displayName": "Contorno (% do tamanho)", "type": { "numeric": true } }
+      }
+    },
+    "outline": {
+      "displayName": "Contorno",
+      "properties": {
+        "show": { "displayName": "Mostrar", "type": { "bool": true } },
+        "color": { "displayName": "Cor", "type": { "fill": { "solid": { "color": true } } } },
+        "width": { "displayName": "Espessura (px)", "type": { "numeric": true } }
+      }
+    }
+  },
+  "sorting": { "default": {} },
+  "supportsHighlight": true,
+  "drilldown": { "roles": ["category"] },
+  "suppressDefaultTitle": false,
+  "advancedEditModeSupport": 1,
+  "privileges": []
+}
