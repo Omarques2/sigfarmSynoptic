@@ -69,10 +69,19 @@ export class OutlineSettings {
   public width: number = 1;
 }
 
+export class LegendSettings {
+  public show: boolean = false;
+  public position: string = "Bottom";
+  public title: string = "";
+  public labelColor: string = "#111111";
+  public fontSize: number = 12;
+}
+
 export class VisualSettings {
   public area: AreaSettings = new AreaSettings();
   public svgSettings: SvgSettings = new SvgSettings();
   public outline: OutlineSettings = new OutlineSettings();
+  public legend: LegendSettings = new LegendSettings();
 
   public static parse(dataView?: DataView): VisualSettings {
     const s = new VisualSettings();
@@ -101,23 +110,30 @@ export class VisualSettings {
     s.outline.color = getFill(objects, "outline", "color", s.outline.color);
     s.outline.width = getNumber(objects, ["outline", "width"], s.outline.width);
 
+    // Legend
+    s.legend.show = getBool(objects, ["legend", "show"], s.legend.show);
+    s.legend.position = getString(objects, ["legend", "position"], s.legend.position);
+    s.legend.title = getString(objects, ["legend", "title"], s.legend.title);
+    s.legend.labelColor = getFill(objects, "legend", "labelColor", s.legend.labelColor);
+    s.legend.fontSize = getNumber(objects, ["legend", "fontSize"], s.legend.fontSize);
+
     return s;
   }
 }
 
 export class AreaFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "area";
-  public displayName: string = "Area";
+  public displayName: string = "Cores das areas";
 
   public unmatchedFill = new formattingSettings.ColorPicker({
     name: "unmatchedFill",
-    displayName: "Unmatched fill",
+    displayName: "Cor sem correspondencia",
     value: { value: "#D3D3D3" }
   });
 
   public matchedFill = new formattingSettings.ColorPicker({
     name: "matchedFill",
-    displayName: "Matched fill",
+    displayName: "Cor das areas (condicional)",
     value: { value: "#4CAF50" },
     instanceKind: powerbi.VisualEnumerationInstanceKinds.ConstantOrRule
   });
@@ -127,48 +143,49 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
 
 export class SvgFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "svgSettings";
-  public displayName: string = "SVG";
+  public displayName: string = "SVG e rotulos";
 
   public svgText = new formattingSettings.TextArea({
     name: "svgText",
-    displayName: "SVG text",
-    placeholder: "Paste SVG text or data URI",
+    displayName: "Conteudo SVG (texto/data URI)",
+    description: "Cole o SVG em texto ou data URI (ex.: data:image/svg+xml;utf8,...)",
+    placeholder: "Cole o texto do SVG ou uma data URI",
     value: ""
   });
 
   public defaultFill = new formattingSettings.ColorPicker({
     name: "defaultFill",
-    displayName: "Default fill",
+    displayName: "Cor padrao (legado)",
     value: { value: "#D3D3D3" }
   });
 
   public labelShow = new formattingSettings.ToggleSwitch({
     name: "labelShow",
-    displayName: "Show labels",
+    displayName: "Mostrar rotulos (valor)",
     value: true
   });
 
   public labelMin = new formattingSettings.NumUpDown({
     name: "labelMin",
-    displayName: "Label min size (px)",
+    displayName: "Tamanho minimo (px)",
     value: 9
   });
 
   public labelMax = new formattingSettings.NumUpDown({
     name: "labelMax",
-    displayName: "Label max size (px)",
+    displayName: "Tamanho maximo (px)",
     value: 26
   });
 
   public labelBold = new formattingSettings.ToggleSwitch({
     name: "labelBold",
-    displayName: "Bold labels",
+    displayName: "Negrito",
     value: true
   });
 
   public labelOutlineFactor = new formattingSettings.NumUpDown({
     name: "labelOutlineFactor",
-    displayName: "Outline factor",
+    displayName: "Contorno (% do tamanho)",
     value: 0.12
   });
 
@@ -185,33 +202,78 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
 
 export class OutlineFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "outline";
-  public displayName: string = "Outline";
+  public displayName: string = "Contorno";
 
   public show = new formattingSettings.ToggleSwitch({
     name: "show",
-    displayName: "Show",
+    displayName: "Mostrar",
     value: false
   });
 
   public color = new formattingSettings.ColorPicker({
     name: "color",
-    displayName: "Color",
+    displayName: "Cor",
     value: { value: "#000000" }
   });
 
   public width = new formattingSettings.NumUpDown({
     name: "width",
-    displayName: "Width (px)",
+    displayName: "Espessura (px)",
     value: 1
   });
 
   public slices = [this.show, this.color, this.width];
 }
 
+export class LegendFormattingCard extends formattingSettings.SimpleCard {
+  public name: string = "legend";
+  public displayName: string = "Legenda";
+
+  public show = new formattingSettings.ToggleSwitch({
+    name: "show",
+    displayName: "Mostrar",
+    value: false
+  });
+
+  public position = new formattingSettings.ItemDropdown({
+    name: "position",
+    displayName: "Posicao",
+    items: [
+      { value: "Top", displayName: "Superior" },
+      { value: "Bottom", displayName: "Inferior" },
+      { value: "Left", displayName: "Esquerda" },
+      { value: "Right", displayName: "Direita" }
+    ],
+    value: { value: "Bottom", displayName: "Inferior" }
+  });
+
+  public title = new formattingSettings.TextInput({
+    name: "title",
+    displayName: "Titulo",
+    placeholder: "Legenda",
+    value: ""
+  });
+
+  public labelColor = new formattingSettings.ColorPicker({
+    name: "labelColor",
+    displayName: "Cor do texto",
+    value: { value: "#111111" }
+  });
+
+  public fontSize = new formattingSettings.NumUpDown({
+    name: "fontSize",
+    displayName: "Tamanho do texto (px)",
+    value: 12
+  });
+
+  public slices = [this.show, this.position, this.title, this.labelColor, this.fontSize];
+}
+
 export class VisualFormattingSettingsModel extends formattingSettings.Model {
   public area = new AreaFormattingCard();
   public svgSettings = new SvgFormattingCard();
   public outline = new OutlineFormattingCard();
+  public legend = new LegendFormattingCard();
 
-  public cards = [this.area, this.svgSettings, this.outline];
+  public cards = [this.area, this.svgSettings, this.outline, this.legend];
 }

@@ -35,6 +35,7 @@ function norm(raw: any): string {
 }
 
 type ValueField = { label: string; value: any };
+type SelectionSource = "none" | "self" | "external";
 type CatRow = {
   key: string;
   rawKey: string;
@@ -268,6 +269,9 @@ export class Visual implements IVisual {
 
   // seleção/foco
   private selectedKeys: Set<string> = new Set();
+  private highlightedKeys: Set<string> = new Set();
+  private hasHighlights = false;
+  private selectionSource: SelectionSource = "none";
 
   // zoom/pan
   private scale = 1;
@@ -286,6 +290,11 @@ export class Visual implements IVisual {
   private uploadCta!: HTMLDivElement;
   private fileInput!: HTMLInputElement;
   private uploadBtn!: HTMLButtonElement;
+
+  // legend
+  private contentHost!: HTMLDivElement;
+  private svgHost!: HTMLDivElement;
+  private legendHost!: HTMLDivElement;
 
   // host env
   private hostEnv: number | undefined;
@@ -309,7 +318,20 @@ export class Visual implements IVisual {
 
     this.tooltipEl = makeTooltipHost(this.container);
 
+    this.contentHost = this.createContentHost();
+    this.svgHost = this.createSvgHost();
+    this.legendHost = this.createLegendUI();
+
     this.createUploadUI();
+
+    if (this.selectionManager?.registerOnSelectCallback) {
+      this.selectionManager.registerOnSelectCallback((ids: ISelectionId[]) => {
+        const src: SelectionSource = ids && ids.length > 0 ? "self" : "none";
+        this.setSelectionFromIds(ids, src);
+      });
+    }
+
+    this.wireContainerContextMenu();
   }
 
   // --- tooltip positioning: garante visibilidade (sem clipping e sem estourar tela) ---
@@ -358,9 +380,111 @@ export class Visual implements IVisual {
     this.positionTooltip(ev.clientX, ev.clientY);
   }
 
+  private getRootSelectionId(): ISelectionId | null {
+    try {
+      const builder = (this.host as any)?.createSelectionIdBuilder?.();
+      if (builder?.createSelectionId) {
+        return builder.createSelectionId();
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  private showContextMenuAt(selectionId: ISelectionId | null | undefined, x: number, y: number) {
+    if (!this.selectionManager?.showContextMenu) return;
+    const id = selectionId ?? this.getRootSelectionId() ?? ({} as ISelectionId);
+    this.selectionManager.showContextMenu(id as any, { x, y });
+  }
+
   private hideTooltip() {
     this.tooltipEl.style.display = "none";
     this.tooltipVisible = false;
+  }
+
+  private isRegionTarget(target: Element | null): boolean {
+    if (!target || !(target as any).closest) return false;
+    return !!target.closest("[data-sp-region='1']");
+  }
+
+  private selectionIdEquals(a: ISelectionId | null | undefined, b: ISelectionId | null | undefined): boolean {
+    if (!a || !b) return false;
+    const aAny = a as any;
+    if (typeof aAny.equals === "function") return aAny.equals(b);
+    if (typeof aAny.includes === "function") return aAny.includes(b, true) || aAny.includes(b);
+    const bAny = b as any;
+    if (typeof bAny.equals === "function") return bAny.equals(a);
+    if (typeof bAny.includes === "function") return bAny.includes(a, true) || bAny.includes(a);
+    return a === b;
+  }
+
+  private setSelectionFromIds(ids?: ISelectionId[] | null, source?: SelectionSource) {
+    if (source) {
+      this.selectionSource = source;
+    }
+    this.selectedKeys.clear();
+
+    if (!ids || ids.length === 0) {
+      if (this.selectionSource === "self") {
+        this.selectionSource = "none";
+      }
+      this.applySelectionVisualState();
+      return;
+    }
+
+    for (const [key, row] of this.dataMap.entries()) {
+      const rowId = row.identity as ISelectionId | null | undefined;
+      if (!rowId) continue;
+
+      for (const id of ids) {
+        if (this.selectionIdEquals(rowId, id)) {
+          this.selectedKeys.add(key);
+          break;
+        }
+      }
+    }
+
+    this.applySelectionVisualState();
+  }
+
+  private syncSelectionFromHighlights(): boolean {
+    if (!this.hasHighlights) return false;
+    this.selectionSource = "external";
+    this.selectedKeys.clear();
+    for (const key of this.highlightedKeys) this.selectedKeys.add(key);
+    return true;
+  }
+
+  private selectRow(row: CatRow, multiSelect: boolean, after?: () => void) {
+    this.selectionSource = "self";
+    const applyLocalSelection = () => {
+      if (multiSelect) {
+        if (this.selectedKeys.has(row.key)) this.selectedKeys.delete(row.key);
+        else this.selectedKeys.add(row.key);
+      } else {
+        this.selectedKeys.clear();
+        this.selectedKeys.add(row.key);
+      }
+      this.applySelectionVisualState();
+    };
+
+    if (!this.selectionManager?.select) {
+      applyLocalSelection();
+      after?.();
+      return;
+    }
+
+    applyLocalSelection();
+    this.selectionManager
+      .select(row.identity as any, multiSelect)
+      .then((ids) => {
+        this.setSelectionFromIds(ids as ISelectionId[], "self");
+        after?.();
+      })
+      .catch(() => {
+        after?.();
+      });
   }
 
   // --- regra: permitir upload SOMENTE no Power BI Desktop ---
@@ -387,6 +511,37 @@ export class Visual implements IVisual {
         }
       ]
     });
+  }
+
+  private createContentHost(): HTMLDivElement {
+    const host = document.createElement("div");
+    host.className = "sp-content";
+    Object.assign(host.style, {
+      position: "absolute",
+      top: "0",
+      right: "0",
+      bottom: "0",
+      left: "0",
+      display: "flex",
+      flexDirection: "column",
+      zIndex: "1",
+      overflow: "hidden"
+    } as CSSStyleDeclaration);
+    this.container.appendChild(host);
+    return host;
+  }
+
+  private createSvgHost(): HTMLDivElement {
+    const host = document.createElement("div");
+    host.className = "sp-svg-host";
+    Object.assign(host.style, {
+      position: "relative",
+      flex: "1 1 auto",
+      minWidth: "0",
+      minHeight: "0"
+    } as CSSStyleDeclaration);
+    this.contentHost.appendChild(host);
+    return host;
   }
 
   private createUploadUI() {
@@ -448,6 +603,9 @@ export class Visual implements IVisual {
     this.uploadBtn = document.createElement("button");
     this.uploadBtn.type = "button";
     this.uploadBtn.textContent = "Trocar SVG";
+    const uploadHint = "Selecione um arquivo .svg (IDs = categoria).";
+    this.uploadBtn.title = uploadHint;
+    this.uploadBtn.setAttribute("aria-label", uploadHint);
     Object.assign(this.uploadBtn.style, {
       position: "absolute",
       top: "10px",
@@ -480,6 +638,152 @@ export class Visual implements IVisual {
     });
 
     this.container.appendChild(this.uploadBtn);
+  }
+
+  private createLegendUI(): HTMLDivElement {
+    const host = document.createElement("div");
+    host.className = "sp-legend";
+    Object.assign(host.style, {
+      display: "none",
+      flex: "0 0 auto",
+      padding: "6px 8px",
+      overflow: "auto",
+      fontFamily: "Segoe UI, -apple-system, Roboto, Arial, sans-serif",
+      color: "#111"
+    } as CSSStyleDeclaration);
+    this.contentHost.appendChild(host);
+    return host;
+  }
+
+  private updateLegend(dv?: DataView, hasSvg?: boolean) {
+    const legend = this.settings.legend;
+    if (!legend?.show || !dv || !hasSvg || this.dataMap.size === 0) {
+      this.legendHost.style.display = "none";
+      this.legendHost.textContent = "";
+      this.contentHost.style.flexDirection = "column";
+      this.contentHost.style.gap = "0";
+      this.legendHost.style.width = "";
+      this.legendHost.style.height = "";
+      this.legendHost.style.maxWidth = "";
+      this.legendHost.style.maxHeight = "";
+      this.legendHost.style.order = "1";
+      this.svgHost.style.order = "0";
+      return;
+    }
+
+    this.legendHost.textContent = "";
+
+    const titleText = (legend.title || "").trim();
+    if (titleText) {
+      const title = document.createElement("div");
+      title.textContent = titleText;
+      Object.assign(title.style, {
+        fontWeight: "700",
+        marginBottom: "4px"
+      } as CSSStyleDeclaration);
+      this.legendHost.appendChild(title);
+    }
+
+    const items = document.createElement("div");
+    const pos = (legend.position || "Bottom").toLowerCase();
+    const vertical = pos === "left" || pos === "right";
+    Object.assign(items.style, {
+      display: "flex",
+      flexDirection: vertical ? "column" : "row",
+      flexWrap: vertical ? "nowrap" : "wrap",
+      gap: "6px 12px"
+    } as CSSStyleDeclaration);
+
+    const fontSize = Math.max(8, Number(legend.fontSize) || 12);
+    const labelColor = legend.labelColor || "#111111";
+
+    for (const row of this.dataMap.values()) {
+      const item = document.createElement("div");
+      item.setAttribute("data-sp-legend-key", row.key);
+      Object.assign(item.style, {
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        minWidth: "0",
+        cursor: "pointer",
+        userSelect: "none"
+      } as CSSStyleDeclaration);
+
+      const swatch = document.createElement("span");
+      Object.assign(swatch.style, {
+        width: "10px",
+        height: "10px",
+        borderRadius: "2px",
+        flex: "0 0 auto",
+        background: row.matchedColor || this.settings.area.matchedFill
+      } as CSSStyleDeclaration);
+
+      const label = document.createElement("span");
+      label.textContent = row.rawKey;
+      Object.assign(label.style, {
+        fontSize: `${fontSize}px`,
+        color: labelColor,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        maxWidth: "220px"
+      } as CSSStyleDeclaration);
+
+      item.appendChild(swatch);
+      item.appendChild(label);
+      items.appendChild(item);
+
+      item.addEventListener("click", (ev: MouseEvent) => {
+        if (ev.button !== 0) return;
+        ev.stopPropagation();
+        const multi = ev.ctrlKey || ev.metaKey;
+        this.selectRow(row, multi);
+      });
+
+      item.addEventListener("contextmenu", (ev: MouseEvent) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+        const x = ev.clientX;
+        const y = ev.clientY;
+        if (this.selectedKeys.has(row.key)) {
+          this.showContextMenuAt(row.identity as any, x, y);
+          return;
+        }
+        this.selectRow(row, false, () => this.showContextMenuAt(row.identity as any, x, y));
+      });
+    }
+
+    this.legendHost.appendChild(items);
+
+    const verticalLayout = pos === "left" || pos === "right";
+    this.contentHost.style.flexDirection = verticalLayout ? "row" : "column";
+    this.contentHost.style.gap = "6px";
+
+    Object.assign(this.legendHost.style, {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-start",
+      flex: "0 0 auto"
+    } as CSSStyleDeclaration);
+
+    const legendFirst = pos === "top" || pos === "left";
+    this.legendHost.style.order = legendFirst ? "0" : "1";
+    this.svgHost.style.order = legendFirst ? "1" : "0";
+    this.svgHost.style.flex = "1 1 auto";
+
+    if (verticalLayout) {
+      this.legendHost.style.height = "100%";
+      this.legendHost.style.maxWidth = "35%";
+      this.legendHost.style.width = "";
+      this.legendHost.style.maxHeight = "";
+    } else {
+      this.legendHost.style.width = "100%";
+      this.legendHost.style.maxHeight = "35%";
+      this.legendHost.style.height = "";
+      this.legendHost.style.maxWidth = "";
+    }
+
+    this.applySelectionVisualState();
   }
 
   private setUploadUIVisibility(hasSvgConfigured: boolean) {
@@ -540,6 +844,9 @@ export class Visual implements IVisual {
       this.svgRoot.remove();
       this.svgRoot = null;
       this.zoomRoot = null;
+    }
+    if (this.svgHost) {
+      this.svgHost.querySelectorAll("svg").forEach((el) => el.remove());
     }
     this.container.querySelectorAll(".sp-no-svg-msg").forEach((e) => e.remove());
   }
@@ -602,6 +909,8 @@ export class Visual implements IVisual {
       } else {
         this.render(svgText, dv);
       }
+
+      this.updateLegend(dv, hasSvg);
 
       succeeded = true;
     } catch (err) {
@@ -670,6 +979,8 @@ export class Visual implements IVisual {
   // ===== data parse =====
   private buildDataMap(dv?: DataView) {
     this.dataMap.clear();
+    this.highlightedKeys.clear();
+    this.hasHighlights = false;
     const cat = dv?.categorical as DataViewCategorical | undefined;
     const catCol = cat?.categories?.[0];
     if (!catCol) return;
@@ -679,12 +990,15 @@ export class Visual implements IVisual {
 
     const measureCol = valueCols.find((vc) => vc?.source?.roles?.measure) || valueCols[0];
     const tooltipCols = valueCols.filter((vc) => vc?.source?.roles?.tooltips);
+    const highlightVals = measureCol?.highlights;
+    this.hasHighlights = Array.isArray(highlightVals);
 
     for (let i = 0; i < catCol.values.length; i++) {
       const rawKey = String(catCol.values[i] ?? "");
       const key = norm(rawKey);
 
       const measureValRaw = measureCol ? (measureCol.values[i] as any) : null;
+      const highlightVal = this.hasHighlights ? (highlightVals as any)?.[i] : undefined;
       const measureValNum =
         measureValRaw === null || measureValRaw === undefined || measureValRaw === ""
           ? null
@@ -706,6 +1020,10 @@ export class Visual implements IVisual {
 
       const objForRow = (catCol.objects && (catCol.objects as any[])[i]) ? (catCol.objects as any[])[i] : null;
       const matchedColor = getFillColorFromObjects(objForRow, "area", "matchedFill", this.settings.area.matchedFill);
+
+      if (this.hasHighlights && highlightVal !== null && highlightVal !== undefined) {
+        this.highlightedKeys.add(key);
+      }
 
       this.dataMap.set(key, {
         key,
@@ -745,6 +1063,11 @@ export class Visual implements IVisual {
 
     svgNode.removeAttribute("width");
     svgNode.removeAttribute("height");
+    svgNode.style.position = "absolute";
+    svgNode.style.top = "0";
+    svgNode.style.right = "0";
+    svgNode.style.bottom = "0";
+    svgNode.style.left = "0";
     svgNode.style.width = "100%";
     svgNode.style.height = "100%";
     svgNode.style.display = "block";
@@ -771,7 +1094,7 @@ export class Visual implements IVisual {
     this.svgRoot = svgNode;
     this.zoomRoot = zoom;
 
-    this.container.appendChild(svgNode);
+    this.svgHost.appendChild(svgNode);
 
     svgNode.querySelectorAll("title").forEach((t) => t.remove());
 
@@ -781,7 +1104,22 @@ export class Visual implements IVisual {
     this.resetToFit();
 
     this.applyRegionsStyleAndEvents();
+    if (!this.syncSelectionFromHighlights()) {
+      this.syncSelectionFromHost();
+    }
     this.applySelectionVisualState();
+  }
+
+  private wireContainerContextMenu() {
+    this.container.addEventListener("contextmenu", (ev: MouseEvent) => {
+      const target = ev.target as Element | null;
+      if (this.svgRoot && target && this.svgRoot.contains(target)) return;
+      if (this.legendHost && target && this.legendHost.contains(target)) return;
+
+      ev.preventDefault();
+      this.hideTooltip();
+      this.showContextMenuAt(null, ev.clientX, ev.clientY);
+    });
   }
 
   private wireZoomPan() {
@@ -820,6 +1158,8 @@ export class Visual implements IVisual {
 
     this.svgRoot.addEventListener("mousedown", (ev: MouseEvent) => {
       if (ev.button !== 0) return;
+      const target = ev.target as Element | null;
+      if (this.isRegionTarget(target)) return;
       this.hideTooltip();
 
       this.isPanning = true;
@@ -850,9 +1190,19 @@ export class Visual implements IVisual {
     });
 
     this.svgRoot.addEventListener("click", (ev: MouseEvent) => {
+      if (ev.button !== 0) return;
       const target = ev.target as Element | null;
-      if (target && (target as any).id) return;
+      if (this.isRegionTarget(target)) return;
+      if (this.selectionSource !== "self") return;
       this.clearSelection();
+    });
+
+    this.svgRoot.addEventListener("contextmenu", (ev: MouseEvent) => {
+      const target = ev.target as Element | null;
+      if (this.isRegionTarget(target)) return;
+      ev.preventDefault();
+      this.hideTooltip();
+      this.showContextMenuAt(null, ev.clientX, ev.clientY);
     });
   }
 
@@ -868,6 +1218,7 @@ export class Visual implements IVisual {
     for (const el of regionEls) {
       const id = (el as any).id as string;
       if (!id) continue;
+      el.setAttribute("data-sp-region", "1");
 
       el.querySelectorAll("title").forEach((t) => t.remove());
       (el as any).removeAttribute?.("title");
@@ -899,20 +1250,32 @@ export class Visual implements IVisual {
         this.hideTooltip();
       });
 
-      el.addEventListener("mousedown", (ev: MouseEvent) => ev.stopPropagation());
-      el.addEventListener("click", (ev: MouseEvent) => {
+      el.addEventListener("contextmenu", (ev: MouseEvent) => {
         ev.stopPropagation();
-        if (!row) return;
+        ev.preventDefault();
+        this.hideTooltip();
 
-        const isSelected = this.selectedKeys.has(row.key);
-        if (isSelected) this.selectedKeys.delete(row.key);
-        else {
-          this.selectedKeys.clear();
-          this.selectedKeys.add(row.key);
+        const x = ev.clientX;
+        const y = ev.clientY;
+
+        if (!row) {
+          this.showContextMenuAt(null, x, y);
+          return;
         }
 
-        this.applySelectionToHost();
-        this.applySelectionVisualState();
+        if (this.selectedKeys.has(row.key)) {
+          this.showContextMenuAt(row.identity as any, x, y);
+          return;
+        }
+
+        this.selectRow(row, false, () => this.showContextMenuAt(row.identity as any, x, y));
+      });
+      el.addEventListener("click", (ev: MouseEvent) => {
+        if (ev.button !== 0) return;
+        if (!row) return;
+
+        const multi = ev.ctrlKey || ev.metaKey;
+        this.selectRow(row, multi);
       });
     }
 
@@ -968,28 +1331,40 @@ export class Visual implements IVisual {
     (el as any).style.strokeWidth = String(o.width);
   }
 
-  private applySelectionToHost() {
+  private syncSelectionFromHost() {
     if (!this.selectionManager) return;
 
-    const key = Array.from(this.selectedKeys)[0];
-    if (!key) {
-      this.selectionManager.clear?.();
-      return;
+    if (typeof this.selectionManager.hasSelection === "function") {
+      const hasSelection = this.selectionManager.hasSelection();
+      if (!hasSelection) {
+        this.setSelectionFromIds([], "none");
+        return;
+      }
     }
 
-    const row = this.dataMap.get(key);
-    if (!row) {
-      this.selectionManager.clear?.();
-      return;
+    if (typeof this.selectionManager.getSelectionIds === "function") {
+      const ids = this.selectionManager.getSelectionIds();
+      const src: SelectionSource = ids && ids.length > 0 ? "self" : "none";
+      this.setSelectionFromIds(ids, src);
     }
-
-    this.selectionManager.select?.(row.identity as any, false);
   }
 
   private clearSelection() {
-    this.selectedKeys.clear();
-    this.selectionManager?.clear?.();
-    this.applySelectionVisualState();
+    if (this.selectionSource !== "self") return;
+    if (!this.selectionManager?.clear) {
+      this.setSelectionFromIds([], "none");
+      return;
+    }
+
+    this.setSelectionFromIds([], "none");
+    if (this.selectionManager.select) {
+      this.selectionManager.select([] as ISelectionId[], false).catch(() => {
+        return;
+      });
+    }
+    this.selectionManager.clear().catch(() => {
+      this.setSelectionFromIds([], "none");
+    });
   }
 
   private applySelectionVisualState() {
@@ -997,7 +1372,6 @@ export class Visual implements IVisual {
 
     const cfg = this.settings.svgSettings;
     const hasFocus = this.selectedKeys.size > 0;
-    const focusKey = hasFocus ? Array.from(this.selectedKeys)[0] : null;
 
     const regionEls = Array.from(
       this.zoomRoot.querySelectorAll<SVGElement>("path[id], polygon[id], rect[id], circle[id], ellipse[id], g[id]")
@@ -1011,7 +1385,7 @@ export class Visual implements IVisual {
       const row = this.dataMap.get(key);
       if (!row) continue;
 
-      const isSelected = focusKey ? key === focusKey : false;
+      const isSelected = hasFocus ? this.selectedKeys.has(key) : false;
 
       if (!hasFocus) {
         (el as any).style.opacity = "1";
@@ -1027,6 +1401,15 @@ export class Visual implements IVisual {
       if (cfg.labelShow) {
         const lab = getLabel(el);
         if (lab) (lab as any).style.display = isSelected ? "" : "none";
+      }
+    }
+
+    if (this.legendHost) {
+      const legendItems = Array.from(this.legendHost.querySelectorAll<HTMLElement>("[data-sp-legend-key]"));
+      for (const item of legendItems) {
+        const key = item.getAttribute("data-sp-legend-key") || "";
+        const isSelected = hasFocus ? this.selectedKeys.has(key) : false;
+        item.style.opacity = hasFocus ? (isSelected ? "1" : "0.35") : "1";
       }
     }
   }

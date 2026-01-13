@@ -54,6 +54,26 @@
         "color": { "displayName": "Cor", "type": { "fill": { "solid": { "color": true } } } },
         "width": { "displayName": "Espessura (px)", "type": { "numeric": true } }
       }
+    },
+    "legend": {
+      "displayName": "Legenda",
+      "properties": {
+        "show": { "displayName": "Mostrar", "type": { "bool": true } },
+        "position": {
+          "displayName": "Posicao",
+          "type": {
+            "enumeration": [
+              { "displayName": "Superior", "value": "Top" },
+              { "displayName": "Inferior", "value": "Bottom" },
+              { "displayName": "Esquerda", "value": "Left" },
+              { "displayName": "Direita", "value": "Right" }
+            ]
+          }
+        },
+        "title": { "displayName": "Titulo", "type": { "text": true } },
+        "labelColor": { "displayName": "Cor do texto", "type": { "fill": { "solid": { "color": true } } } },
+        "fontSize": { "displayName": "Tamanho do texto (px)", "type": { "numeric": true } }
+      }
     }
   },
   "sorting": { "default": {} },
