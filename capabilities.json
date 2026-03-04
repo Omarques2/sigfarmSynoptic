@@ -1,6 +1,8 @@
 {
   "dataRoles": [
     { "displayName": "Região (ID do SVG)", "name": "category", "kind": "Grouping" },
+    { "displayName": "Cor (tema)", "name": "colorBy", "kind": "Grouping" },
+    { "displayName": "Legenda", "name": "legend", "kind": "Grouping" },
     { "displayName": "Valor", "name": "measure", "kind": "Measure" },
     { "displayName": "Tooltips", "name": "tooltips", "kind": "Measure" }
   ],
@@ -8,7 +10,11 @@
     {
       "categorical": {
         "categories": {
-          "for": { "in": "category" },
+          "select": [
+            { "for": { "in": "category" } },
+            { "for": { "in": "colorBy" } },
+            { "for": { "in": "legend" } }
+          ],
           "dataReductionAlgorithm": { "top": {} }
         },
         "values": {
@@ -29,7 +35,7 @@
           "type": { "fill": { "solid": { "color": true } } }
         },
         "matchedFill": {
-          "displayName": "Cor das áreas (condicional)",
+          "displayName": "Cor das áreas",
           "type": { "fill": { "solid": { "color": true } } }
         }
       }
@@ -39,6 +45,7 @@
       "properties": {
         "svgText": { "displayName": "Conteúdo SVG (texto/Data URI)", "type": { "text": true } },
         "defaultFill": { "displayName": "Cor padrão (legado)", "type": { "fill": { "solid": { "color": true } } } },
+        "alwaysShowWarning": { "displayName": "Sempre mostrar aviso de sanitização", "type": { "bool": true } },
 
         "labelShow": { "displayName": "Mostrar rótulos (Valor)", "type": { "bool": true } },
         "labelMin": { "displayName": "Tamanho mínimo (px)", "type": { "numeric": true } },
@@ -74,12 +81,45 @@
         "labelColor": { "displayName": "Cor do texto", "type": { "fill": { "solid": { "color": true } } } },
         "fontSize": { "displayName": "Tamanho do texto (px)", "type": { "numeric": true } }
       }
+    },
+    "help": {
+      "displayName": "Ajuda",
+      "properties": {
+        "show": { "displayName": "Mostrar dicas", "type": { "bool": true } }
+      }
+    },
+    "warning": {
+      "displayName": "Avisos",
+      "properties": {
+        "show": { "displayName": "Mostrar avisos de sanitização", "type": { "bool": true } }
+      }
+    },
+    "ui": {
+      "displayName": "Interface",
+      "properties": {
+        "language": {
+          "displayName": "Idioma",
+          "type": {
+            "enumeration": [
+              { "displayName": "Auto (sistema)", "value": "auto" },
+              { "displayName": "Português", "value": "pt" },
+              { "displayName": "English", "value": "en" }
+            ]
+          }
+        }
+      }
     }
   },
   "sorting": { "default": {} },
+  "supportsKeyboardFocus": true,
   "supportsHighlight": true,
   "drilldown": { "roles": ["category"] },
   "suppressDefaultTitle": false,
   "advancedEditModeSupport": 1,
-  "privileges": []
+  "privileges": [
+    {
+      "name": "LocalStorage",
+      "essential": false
+    }
+  ]
 }

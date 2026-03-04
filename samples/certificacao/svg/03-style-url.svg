@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="460" viewBox="0 0 520 460">
+  <defs>
+    <linearGradient id="grad1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2196F3"/>
+      <stop offset="100%" stop-color="#4CAF50"/>
+    </linearGradient>
+  </defs>
+  <rect id="SFE_017" x="10" y="10" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_027A" x="110" y="10" width="90" height="60" fill="url(#grad1)" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_032A" x="210" y="10" width="90" height="60" fill="url(http://evil.example/grad)" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_068" x="310" y="10" width="90" height="60" style="fill:url(http://evil.example/x); stroke:#000;"/>
+  <rect id="SFE_137" x="410" y="10" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_138" x="10" y="80" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_139" x="110" y="80" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_140" x="210" y="80" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_141" x="310" y="80" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_142" x="410" y="80" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_143" x="10" y="150" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_144" x="110" y="150" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_145" x="210" y="150" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_146" x="310" y="150" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_147" x="410" y="150" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_148" x="10" y="220" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_149" x="110" y="220" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_150" x="210" y="220" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_151" x="310" y="220" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_152" x="410" y="220" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_153" x="10" y="290" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_154" x="110" y="290" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_ENF002" x="210" y="290" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_ENF003" x="310" y="290" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+  <rect id="SFE_ENF004" x="410" y="290" width="90" height="60" fill="#D3D3D3" stroke="#999" stroke-width="1"/>
+</svg>

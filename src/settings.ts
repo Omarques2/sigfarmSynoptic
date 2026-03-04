@@ -53,6 +53,7 @@ export class AreaSettings {
 export class SvgSettings {
   public svgText: string = "";
   public defaultFill: string = "#D3D3D3";
+  public alwaysShowWarning: boolean = false;
 
   public labelShow: boolean = true;
   public labelMin: number = 9;     // px
@@ -77,11 +78,26 @@ export class LegendSettings {
   public fontSize: number = 12;
 }
 
+export class HelpSettings {
+  public show: boolean = false;
+}
+
+export class WarningSettings {
+  public show: boolean = true;
+}
+
+export class UiSettings {
+  public language: string = "auto";
+}
+
 export class VisualSettings {
   public area: AreaSettings = new AreaSettings();
   public svgSettings: SvgSettings = new SvgSettings();
   public outline: OutlineSettings = new OutlineSettings();
   public legend: LegendSettings = new LegendSettings();
+  public help: HelpSettings = new HelpSettings();
+  public warning: WarningSettings = new WarningSettings();
+  public ui: UiSettings = new UiSettings();
 
   public static parse(dataView?: DataView): VisualSettings {
     const s = new VisualSettings();
@@ -94,6 +110,11 @@ export class VisualSettings {
     // SVG
     s.svgSettings.svgText = getString(objects, ["svgSettings", "svgText"], s.svgSettings.svgText);
     s.svgSettings.defaultFill = getFill(objects, "svgSettings", "defaultFill", s.svgSettings.defaultFill);
+    s.svgSettings.alwaysShowWarning = getBool(
+      objects,
+      ["svgSettings", "alwaysShowWarning"],
+      s.svgSettings.alwaysShowWarning
+    );
 
     s.svgSettings.labelShow = getBool(objects, ["svgSettings", "labelShow"], s.svgSettings.labelShow);
     s.svgSettings.labelMin  = getNumber(objects, ["svgSettings", "labelMin"], s.svgSettings.labelMin);
@@ -117,6 +138,15 @@ export class VisualSettings {
     s.legend.labelColor = getFill(objects, "legend", "labelColor", s.legend.labelColor);
     s.legend.fontSize = getNumber(objects, ["legend", "fontSize"], s.legend.fontSize);
 
+    // Help
+    s.help.show = getBool(objects, ["help", "show"], s.help.show);
+
+    // Warning
+    s.warning.show = getBool(objects, ["warning", "show"], s.warning.show);
+
+    // UI
+    s.ui.language = getString(objects, ["ui", "language"], s.ui.language);
+
     return s;
   }
 }
@@ -133,9 +163,8 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
 
   public matchedFill = new formattingSettings.ColorPicker({
     name: "matchedFill",
-    displayName: "Cor das areas (condicional)",
-    value: { value: "#4CAF50" },
-    instanceKind: powerbi.VisualEnumerationInstanceKinds.ConstantOrRule
+    displayName: "Cor das areas",
+    value: { value: "#4CAF50" }
   });
 
   public slices = [this.unmatchedFill, this.matchedFill];
@@ -157,6 +186,12 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
     name: "defaultFill",
     displayName: "Cor padrao (legado)",
     value: { value: "#D3D3D3" }
+  });
+
+  public alwaysShowWarning = new formattingSettings.ToggleSwitch({
+    name: "alwaysShowWarning",
+    displayName: "Sempre mostrar aviso de sanitizacao",
+    value: false
   });
 
   public labelShow = new formattingSettings.ToggleSwitch({
@@ -192,6 +227,7 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
   public slices = [
     this.svgText,
     this.defaultFill,
+    this.alwaysShowWarning,
     this.labelShow,
     this.labelMin,
     this.labelMax,
@@ -269,11 +305,58 @@ export class LegendFormattingCard extends formattingSettings.SimpleCard {
   public slices = [this.show, this.position, this.title, this.labelColor, this.fontSize];
 }
 
+export class HelpFormattingCard extends formattingSettings.SimpleCard {
+  public name: string = "help";
+  public displayName: string = "Ajuda";
+
+  public show = new formattingSettings.ToggleSwitch({
+    name: "show",
+    displayName: "Mostrar dicas",
+    value: false
+  });
+
+  public slices = [this.show];
+}
+
+export class WarningFormattingCard extends formattingSettings.SimpleCard {
+  public name: string = "warning";
+  public displayName: string = "Avisos";
+
+  public show = new formattingSettings.ToggleSwitch({
+    name: "show",
+    displayName: "Mostrar avisos de sanitizacao",
+    value: true
+  });
+
+  public slices = [this.show];
+}
+
+export class UiFormattingCard extends formattingSettings.SimpleCard {
+  public name: string = "ui";
+  public displayName: string = "Interface";
+
+  public language = new formattingSettings.ItemDropdown({
+    name: "language",
+    displayName: "Idioma",
+    items: [
+      { value: "auto", displayName: "Auto (sistema)" },
+      { value: "pt", displayName: "Português" },
+      { value: "en", displayName: "English" }
+    ],
+    value: { value: "auto", displayName: "Auto (sistema)" }
+  });
+
+  public slices = [this.language];
+}
+
 export class VisualFormattingSettingsModel extends formattingSettings.Model {
   public area = new AreaFormattingCard();
   public svgSettings = new SvgFormattingCard();
   public outline = new OutlineFormattingCard();
   public legend = new LegendFormattingCard();
+  public help = new HelpFormattingCard();
+  public warning = new WarningFormattingCard();
+  public ui = new UiFormattingCard();
 
-  public cards = [this.area, this.svgSettings, this.outline, this.legend];
+  public cards = [this.area, this.svgSettings, this.outline, this.legend, this.help, this.warning, this.ui];
 }
