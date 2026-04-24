@@ -30,12 +30,42 @@
     "area": {
       "displayName": "Area",
       "properties": {
+        "colorMode": {
+          "displayName": "Modo de cor",
+          "type": {
+            "enumeration": [
+              { "displayName": "Cor simples", "value": "Solid" },
+              { "displayName": "Gradiente", "value": "Gradient" }
+            ]
+          }
+        },
         "unmatchedFill": {
           "displayName": "Cor (sem correspondência)",
           "type": { "fill": { "solid": { "color": true } } }
         },
         "matchedFill": {
           "displayName": "Cor das áreas",
+          "type": { "fill": { "solid": { "color": true } } }
+        },
+        "gradientLowFill": {
+          "displayName": "Valor baixo",
+          "type": { "fill": { "solid": { "color": true } } }
+        },
+        "gradientMidFill": {
+          "displayName": "Valor médio",
+          "type": { "fill": { "solid": { "color": true } } }
+        },
+        "gradientHighFill": {
+          "displayName": "Valor alto",
+          "type": { "fill": { "solid": { "color": true } } }
+        }
+      }
+    },
+    "nativeAreaColors": {
+      "displayName": "Cores condicionais por area",
+      "properties": {
+        "fill": {
+          "displayName": "Cor da area",
           "type": { "fill": { "solid": { "color": true } } }
         }
       }

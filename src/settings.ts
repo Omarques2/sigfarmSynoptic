@@ -45,9 +45,17 @@ function getFill(root: unknown, objectName: string, prop: string, def: string): 
   return def;
 }
 
+function normalizeAreaColorMode(mode: string | undefined | null): string {
+  return mode === "Gradient" ? "Gradient" : "Solid";
+}
+
 export class AreaSettings {
+  public colorMode: string = "Solid";
   public unmatchedFill: string = "#D3D3D3";
   public matchedFill: string = "#4CAF50";
+  public gradientLowFill: string = "#FFF4B8";
+  public gradientMidFill: string = "#B9DCFF";
+  public gradientHighFill: string = "#1F5AA6";
 }
 
 export class SvgSettings {
@@ -104,8 +112,12 @@ export class VisualSettings {
     const objects = (dataView?.metadata?.objects as unknown) ?? undefined;
 
     // Area
+    s.area.colorMode = normalizeAreaColorMode(getString(objects, ["area", "colorMode"], s.area.colorMode));
     s.area.unmatchedFill = getFill(objects, "area", "unmatchedFill", s.area.unmatchedFill);
     s.area.matchedFill   = getFill(objects, "area", "matchedFill",   s.area.matchedFill);
+    s.area.gradientLowFill = getFill(objects, "area", "gradientLowFill", s.area.gradientLowFill);
+    s.area.gradientMidFill = getFill(objects, "area", "gradientMidFill", s.area.gradientMidFill);
+    s.area.gradientHighFill = getFill(objects, "area", "gradientHighFill", s.area.gradientHighFill);
 
     // SVG
     s.svgSettings.svgText = getString(objects, ["svgSettings", "svgText"], s.svgSettings.svgText);
@@ -151,9 +163,46 @@ export class VisualSettings {
   }
 }
 
+class ObjectBoundColorPicker extends formattingSettings.ColorPicker {
+  constructor(
+    object: ConstructorParameters<typeof formattingSettings.ColorPicker>[0] & { objectNameOverride: string }
+  ) {
+    super(object);
+    Object.assign(this, object);
+  }
+
+  public objectNameOverride!: string;
+
+  public getFormattingComponent(
+    objectName: string,
+    localizationManager?: powerbi.extensibility.ILocalizationManager
+  ): powerbi.visuals.SimpleComponentBase<powerbi.ThemeColorData> {
+    void localizationManager;
+    return super.getFormattingComponent(this.objectNameOverride || objectName);
+  }
+
+  public getRevertToDefaultDescriptor(objectName: string): powerbi.visuals.FormattingDescriptor[] {
+    return super.getRevertToDefaultDescriptor(this.objectNameOverride || objectName);
+  }
+
+  public setPropertiesValues(dataViewObjects: powerbi.DataViewObjects, objectName: string): void {
+    super.setPropertiesValues(dataViewObjects, this.objectNameOverride || objectName);
+  }
+}
+
 export class AreaFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "area";
   public displayName: string = "Cores das areas";
+
+  public colorMode = new formattingSettings.ItemDropdown({
+    name: "colorMode",
+    displayName: "Modo de cor",
+    items: [
+      { value: "Solid", displayName: "Cor simples" },
+      { value: "Gradient", displayName: "Gradiente" }
+    ],
+    value: { value: "Solid", displayName: "Cor simples" }
+  });
 
   public unmatchedFill = new formattingSettings.ColorPicker({
     name: "unmatchedFill",
@@ -161,13 +210,58 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
     value: { value: "#D3D3D3" }
   });
 
-  public matchedFill = new formattingSettings.ColorPicker({
-    name: "matchedFill",
+  public matchedFill = new ObjectBoundColorPicker({
+    name: "fill",
     displayName: "Cor das areas",
-    value: { value: "#4CAF50" }
+    value: { value: "#4CAF50" },
+    objectNameOverride: "nativeAreaColors",
+    selector: { data: [{ roles: ["category"] }] } as powerbi.data.Selector,
+    altConstantSelector: null as any,
+    instanceKind: powerbi.VisualEnumerationInstanceKinds.ConstantOrRule
   });
 
-  public slices = [this.unmatchedFill, this.matchedFill];
+  public gradientLowFill = new formattingSettings.ColorPicker({
+    name: "gradientLowFill",
+    displayName: "Valor baixo",
+    value: { value: "#FFF4B8" }
+  });
+
+  public gradientMidFill = new formattingSettings.ColorPicker({
+    name: "gradientMidFill",
+    displayName: "Valor medio",
+    value: { value: "#B9DCFF" }
+  });
+
+  public gradientHighFill = new formattingSettings.ColorPicker({
+    name: "gradientHighFill",
+    displayName: "Valor alto",
+    value: { value: "#1F5AA6" }
+  });
+
+  public slices = [
+    this.colorMode,
+    this.unmatchedFill,
+    this.matchedFill,
+    this.gradientLowFill,
+    this.gradientMidFill,
+    this.gradientHighFill
+  ];
+
+  public applyAreaFormattingVisibility(colorMode: string, nativeFallbackFill: string) {
+    const mode = normalizeAreaColorMode(colorMode);
+    const currentSimpleFill = this.matchedFill.value?.value || nativeFallbackFill;
+    this.colorMode.visible = true;
+    this.unmatchedFill.visible = true;
+    this.matchedFill.visible = mode === "Solid";
+    this.gradientLowFill.visible = mode === "Gradient";
+    this.gradientMidFill.visible = mode === "Gradient";
+    this.gradientHighFill.visible = mode === "Gradient";
+    this.matchedFill.value = { value: currentSimpleFill };
+    this.colorMode.value =
+      mode === "Gradient"
+        ? { value: "Gradient", displayName: "Gradiente" }
+        : { value: "Solid", displayName: "Cor simples" };
+  }
 }
 
 export class SvgFormattingCard extends formattingSettings.SimpleCard {

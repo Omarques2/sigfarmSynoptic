@@ -11,3 +11,6 @@ Arquivos:
 - svg/04-disallowed-tags.svg (foreignObject/iframe devem ser removidos)
 
 Observacao: o visual usa o ID do elemento SVG para cruzar com "Curral".
+
+Caso de uso adicional:
+- O modo `Gradient` usa a medida atual para calcular a cor final de cada area sem alterar a sanitizacao do SVG.

@@ -65,8 +65,31 @@ type CatRow = {
   fields: ValueField[];
   identity: ISelectionId;
   idx: number;
-  matchedColor: string;
+  themeColor: string | null;
+  nativeFill: string | null;
+  fillColor: string;
 };
+type GradientStats = { min: number; max: number } | null;
+
+const NATIVE_AREA_COLORS_OBJECT = "nativeAreaColors";
+const NATIVE_AREA_COLORS_PROPERTY = "fill";
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const toHex = (channel: number) => clamp(Math.round(channel), 0, 255).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function interpolateHexColor(from: string, to: string, t: number): string {
+  const start = hexToRgb(from);
+  const end = hexToRgb(to);
+  if (!start || !end) return to;
+  const clampedT = clamp(t, 0, 1);
+  return rgbToHex(
+    start.r + (end.r - start.r) * clampedT,
+    start.g + (end.g - start.g) * clampedT,
+    start.b + (end.b - start.b) * clampedT
+  );
+}
 
 function buildTooltipContent(title: string, fields: ValueField[]): HTMLDivElement {
   const wrapper = document.createElement("div");
@@ -155,10 +178,179 @@ function bestTextColor(bg: string): { text: string; outline: string } {
 }
 
 // --- rótulos ---
+type GeometryBBox = { x: number; y: number; width: number; height: number };
+type LabelPlacement = { x: number; y: number; fits: boolean };
+
+function getGeometryBBox(el: SVGElement | null | undefined): GeometryBBox {
+  if (!el || !(el as any).getBBox) return { x: 0, y: 0, width: 0, height: 0 };
+  try {
+    const bbox = (el as any).getBBox();
+    return {
+      x: Number.isFinite(bbox?.x) ? bbox.x : 0,
+      y: Number.isFinite(bbox?.y) ? bbox.y : 0,
+      width: Number.isFinite(bbox?.width) ? bbox.width : 0,
+      height: Number.isFinite(bbox?.height) ? bbox.height : 0
+    };
+  } catch {
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
+}
+
+function getRegionGeometryElements(el: SVGElement): SVGElement[] {
+  const tag = el.tagName.toLowerCase();
+  if (tag !== "g") return [el];
+
+  const shapes = Array.from(el.querySelectorAll<SVGElement>("path, polygon, rect, circle, ellipse"));
+  if (shapes.length === 0) return [el];
+
+  return shapes.filter((shape) => {
+    const bbox = getGeometryBBox(shape);
+    return bbox.width > 0 && bbox.height > 0;
+  });
+}
+
+function getRegionBBox(el: SVGElement): GeometryBBox {
+  const geometries = getRegionGeometryElements(el);
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const geometry of geometries) {
+    const bbox = getGeometryBBox(geometry);
+    if (!(bbox.width > 0) || !(bbox.height > 0)) continue;
+    minX = Math.min(minX, bbox.x);
+    minY = Math.min(minY, bbox.y);
+    maxX = Math.max(maxX, bbox.x + bbox.width);
+    maxY = Math.max(maxY, bbox.y + bbox.height);
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return getGeometryBBox(el);
+  }
+
+  return { x: minX, y: minY, width: Math.max(0, maxX - minX), height: Math.max(0, maxY - minY) };
+}
+
+function regionContainsPoint(el: SVGElement, x: number, y: number): boolean {
+  const geometries = getRegionGeometryElements(el);
+  for (const geometry of geometries) {
+    try {
+      const svgGeometry = geometry as unknown as SVGGeometryElement;
+      if (typeof svgGeometry.isPointInFill === "function" && svgGeometry.isPointInFill({ x, y })) {
+        return true;
+      }
+    } catch {
+      // fallback below
+    }
+
+    const bbox = getGeometryBBox(geometry);
+    if (x >= bbox.x && x <= bbox.x + bbox.width && y >= bbox.y && y <= bbox.y + bbox.height) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function labelRectFitsRegion(el: SVGElement, cx: number, cy: number, width: number, height: number): boolean {
+  if (!(width > 0) || !(height > 0)) return regionContainsPoint(el, cx, cy);
+
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const samplePoints = [
+    { x: cx, y: cy },
+    { x: cx - halfWidth, y: cy },
+    { x: cx + halfWidth, y: cy },
+    { x: cx, y: cy - halfHeight },
+    { x: cx, y: cy + halfHeight },
+    { x: cx - halfWidth, y: cy - halfHeight },
+    { x: cx + halfWidth, y: cy - halfHeight },
+    { x: cx - halfWidth, y: cy + halfHeight },
+    { x: cx + halfWidth, y: cy + halfHeight }
+  ];
+
+  return samplePoints.every((point) => regionContainsPoint(el, point.x, point.y));
+}
+
+function estimatePlacementClearance(el: SVGElement, x: number, y: number, bbox: GeometryBBox): number {
+  const baseStep = Math.max(2, Math.min(bbox.width, bbox.height) / 24);
+  const maxRadius = Math.max(baseStep, Math.min(bbox.width, bbox.height) / 2);
+  const directions = [
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+    { x: 0.7071, y: 0.7071 },
+    { x: 0.7071, y: -0.7071 },
+    { x: -0.7071, y: 0.7071 },
+    { x: -0.7071, y: -0.7071 }
+  ];
+
+  let clearance = 0;
+  for (let radius = baseStep; radius <= maxRadius; radius += baseStep) {
+    const isInsideRing = directions.every((dir) => regionContainsPoint(el, x + dir.x * radius, y + dir.y * radius));
+    if (!isInsideRing) break;
+    clearance = radius;
+  }
+  return clearance;
+}
+
+function findLabelPlacement(el: SVGElement, labelWidth: number, labelHeight: number): LabelPlacement {
+  const bbox = getRegionBBox(el);
+  const fallback = {
+    x: bbox.x + bbox.width / 2,
+    y: bbox.y + bbox.height / 2,
+    fits: false
+  };
+
+  if (!(bbox.width > 0) || !(bbox.height > 0)) return fallback;
+
+  type Candidate = { x: number; y: number; fits: boolean; score: number };
+
+  const evaluateCandidate = (x: number, y: number): Candidate | null => {
+    if (!regionContainsPoint(el, x, y)) return null;
+    const fits = labelRectFitsRegion(el, x, y, labelWidth, labelHeight);
+    const clearance = estimatePlacementClearance(el, x, y, bbox);
+    return {
+      x,
+      y,
+      fits,
+      score: (fits ? 1_000_000 : 0) + clearance
+    };
+  };
+
+  let best = evaluateCandidate(fallback.x, fallback.y);
+  const geometries = getRegionGeometryElements(el);
+  for (const geometry of geometries) {
+    const shapeBBox = getGeometryBBox(geometry);
+    const candidate = evaluateCandidate(shapeBBox.x + shapeBBox.width / 2, shapeBBox.y + shapeBBox.height / 2);
+    if (candidate && (!best || candidate.score > best.score)) best = candidate;
+  }
+
+  const scanAround = (centerX: number, centerY: number, spanX: number, spanY: number, divisions: number) => {
+    for (let row = 0; row <= divisions; row++) {
+      for (let col = 0; col <= divisions; col++) {
+        const x = centerX - spanX / 2 + (spanX * col) / divisions;
+        const y = centerY - spanY / 2 + (spanY * row) / divisions;
+        const candidate = evaluateCandidate(x, y);
+        if (candidate && (!best || candidate.score > best.score)) {
+          best = candidate;
+        }
+      }
+    }
+  };
+
+  scanAround(fallback.x, fallback.y, bbox.width, bbox.height, 12);
+  if (best) {
+    scanAround(best.x, best.y, Math.max(labelWidth * 2, bbox.width / 3), Math.max(labelHeight * 2, bbox.height / 3), 10);
+    scanAround(best.x, best.y, Math.max(labelWidth, bbox.width / 6), Math.max(labelHeight, bbox.height / 6), 8);
+  }
+
+  return best || fallback;
+}
+
 function upsertLabel(el: SVGElement, text: string, fillColorForContrast: string, cfg: SvgSettings) {
-  const bbox = (el as any).getBBox ? (el as any).getBBox() : { x: 0, y: 0, width: 0, height: 0 };
-  const cx = bbox.x + bbox.width / 2;
-  const cy = bbox.y + bbox.height / 2;
+  const bbox = getRegionBBox(el);
 
   let t = el.parentNode?.querySelector(
     "text.sp-label[data-for='" + (el as any).id + "']"
@@ -175,13 +367,11 @@ function upsertLabel(el: SVGElement, text: string, fillColorForContrast: string,
 
   const min = Math.max(6, Number(cfg.labelMin) || 9);
   const max = Math.max(min, Number(cfg.labelMax) || 26);
-  const rawSize = 0.5 * (bbox?.height ?? 20);
-  const fontSize = Math.max(min, Math.min(rawSize, max));
+  const rawSize = Math.min(0.5 * (bbox?.height ?? 20), 0.35 * Math.max(bbox?.width ?? 20, 20));
+  let fontSize = Math.max(min, Math.min(rawSize, max));
 
-  t.setAttribute("x", String(cx));
-  t.setAttribute("y", String(cy));
-  t.setAttribute("font-size", String(fontSize));
   t.setAttribute("font-weight", cfg.labelBold ? "700" : "400");
+  t.textContent = text;
 
   const c = bestTextColor(fillColorForContrast);
   t.setAttribute("fill", c.text);
@@ -189,9 +379,28 @@ function upsertLabel(el: SVGElement, text: string, fillColorForContrast: string,
   t.setAttribute("stroke", c.outline);
   t.setAttribute("stroke-width", String(Math.max(0, Math.round(fontSize * factor))));
   t.setAttribute("paint-order", "stroke");
-  t.textContent = text;
-
   (t as any).style.display = "";
+
+  let bestPlacement: LabelPlacement = {
+    x: bbox.x + bbox.width / 2,
+    y: bbox.y + bbox.height / 2,
+    fits: false
+  };
+
+  for (let size = fontSize; size >= min; size -= 1) {
+    t.setAttribute("font-size", String(size));
+    t.setAttribute("stroke-width", String(Math.max(0, Math.round(size * factor))));
+    const measured = getGeometryBBox(t);
+    const placement = findLabelPlacement(el, measured.width, measured.height);
+    bestPlacement = placement;
+    fontSize = size;
+    if (placement.fits || size === min) break;
+  }
+
+  t.setAttribute("font-size", String(fontSize));
+  t.setAttribute("stroke-width", String(Math.max(0, Math.round(fontSize * factor))));
+  t.setAttribute("x", String(bestPlacement.x));
+  t.setAttribute("y", String(bestPlacement.y));
 }
 function getLabel(el: SVGElement): SVGTextElement | null {
   return (el.parentNode?.querySelector(
@@ -576,6 +785,15 @@ function tryGetFillColorFromObjects(objects: any, objectName: string, prop: stri
   }
 }
 
+function tryGetSelectionIdSelector(selectionId: ISelectionId | null | undefined): powerbi.data.Selector | undefined {
+  try {
+    const selector = (selectionId as any)?.getSelector?.();
+    return selector && typeof selector === "object" ? selector : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 
 export class Visual implements IVisual {
   private host: any;
@@ -606,6 +824,7 @@ export class Visual implements IVisual {
   private panStartPt: { x: number; y: number } | null = null;
   private panStartT: { x: number; y: number } | null = null;
   private fitTransform: { scale: number; tx: number; ty: number } = { scale: 1, tx: 0, ty: 0 };
+  private fitRafId: number | null = null;
 
   // tooltip
   private tooltipEl!: HTMLDivElement;
@@ -1536,6 +1755,20 @@ export class Visual implements IVisual {
 
   private updateLegend(dv?: DataView, hasSvg?: boolean) {
     const legend = this.settings.legend;
+    if (this.settings.area.colorMode === "Gradient") {
+      this.legendHost.style.display = "none";
+      this.legendHost.textContent = "";
+      this.contentHost.style.flexDirection = "column";
+      this.contentHost.style.gap = "0";
+      this.legendHost.style.width = "";
+      this.legendHost.style.height = "";
+      this.legendHost.style.maxWidth = "";
+      this.legendHost.style.maxHeight = "";
+      this.legendHost.style.order = "1";
+      this.svgHost.style.order = "0";
+      return;
+    }
+
     if (!legend?.show || !dv || !hasSvg || this.dataMap.size === 0) {
       this.legendHost.style.display = "none";
       this.legendHost.textContent = "";
@@ -1609,7 +1842,7 @@ export class Visual implements IVisual {
         userSelect: "none"
       } as CSSStyleDeclaration);
 
-      const swatchColor = inHighContrast && hcPalette ? hcPalette.foreground : row.matchedColor || this.settings.area.matchedFill;
+      const swatchColor = inHighContrast && hcPalette ? hcPalette.foreground : row.fillColor || this.settings.area.matchedFill;
       const swatch = document.createElement("span");
       Object.assign(swatch.style, {
         width: "10px",
@@ -1768,6 +2001,10 @@ export class Visual implements IVisual {
   }
 
   private clearSvg() {
+    if (this.fitRafId !== null) {
+      cancelAnimationFrame(this.fitRafId);
+      this.fitRafId = null;
+    }
     if (this.svgRoot) {
       this.svgRoot.remove();
       this.svgRoot = null;
@@ -1809,6 +2046,61 @@ export class Visual implements IVisual {
 
   private computeFitTransform() {
     this.fitTransform = { scale: 1, tx: 0, ty: 0 };
+    if (!this.svgRoot || !this.zoomRoot) return;
+
+    const hostW = this.svgHost.clientWidth;
+    const hostH = this.svgHost.clientHeight;
+    if (!(hostW > 0) || !(hostH > 0)) return;
+
+    let bbox: DOMRect | null = null;
+    try {
+      const measured = this.zoomRoot.getBBox();
+      if (
+        Number.isFinite(measured.x) &&
+        Number.isFinite(measured.y) &&
+        Number.isFinite(measured.width) &&
+        Number.isFinite(measured.height) &&
+        measured.width > 0 &&
+        measured.height > 0
+      ) {
+        bbox = measured;
+      }
+    } catch {
+      bbox = null;
+    }
+    if (!bbox) return;
+
+    const vb = this.svgRoot.viewBox?.baseVal;
+    const viewportW = vb && vb.width > 0 ? vb.width : hostW;
+    const viewportH = vb && vb.height > 0 ? vb.height : hostH;
+    const padPx = Math.max(8, Math.min(hostW, hostH) * 0.02);
+    const padX = viewportW > 0 && hostW > 0 ? padPx * (viewportW / hostW) : padPx;
+    const padY = viewportH > 0 && hostH > 0 ? padPx * (viewportH / hostH) : padPx;
+    const fitW = viewportW - padX * 2;
+    const fitH = viewportH - padY * 2;
+    if (!(fitW > 0) || !(fitH > 0)) return;
+
+    const scale = Math.min(fitW / bbox.width, fitH / bbox.height);
+    if (!Number.isFinite(scale) || scale <= 0) return;
+
+    const tx = padX + (fitW - bbox.width * scale) / 2 - bbox.x * scale;
+    const ty = padY + (fitH - bbox.height * scale) / 2 - bbox.y * scale;
+    if (!Number.isFinite(tx) || !Number.isFinite(ty)) return;
+
+    this.fitTransform = { scale, tx, ty };
+  }
+
+  private scheduleFitToHost() {
+    if (this.fitRafId !== null) {
+      cancelAnimationFrame(this.fitRafId);
+    }
+
+    this.fitRafId = requestAnimationFrame(() => {
+      this.fitRafId = null;
+      if (!this.svgRoot || !this.zoomRoot) return;
+      this.computeFitTransform();
+      this.resetToFit();
+    });
   }
 
   private getThemeColorForKey(key: string): string | null {
@@ -1870,6 +2162,11 @@ export class Visual implements IVisual {
         ? this.formattingSettingsService.populateFormattingSettingsModel(VisualFormattingSettingsModel, dv)
         : new VisualFormattingSettingsModel();
       this.settings = VisualSettings.parse(dv);
+      this.buildDataMap(dv);
+      this.formattingSettingsModel.area.applyAreaFormattingVisibility(
+        this.settings.area.colorMode,
+        this.settings.area.matchedFill
+      );
       this.applyHighContrastHostStyles();
 
       const svgText = (this.settings.svgSettings.svgText || "").trim();
@@ -1900,6 +2197,11 @@ export class Visual implements IVisual {
       }
 
       this.updateLegend(dv, hasSvg);
+      if (this.svgRoot && this.zoomRoot) {
+        this.computeFitTransform();
+        this.resetToFit();
+        this.scheduleFitToHost();
+      }
       const helpShow = !!this.settings?.help?.show;
       let forceHelpShow = false;
       if (this.helpInitialized) {
@@ -1934,8 +2236,12 @@ export class Visual implements IVisual {
         objectName: "area",
         selector: null as any,
         properties: {
+          colorMode: this.settings.area.colorMode,
           unmatchedFill: { solid: { color: this.settings.area.unmatchedFill } },
-          matchedFill: { solid: { color: this.settings.area.matchedFill } }
+          matchedFill: { solid: { color: this.settings.area.matchedFill } },
+          gradientLowFill: { solid: { color: this.settings.area.gradientLowFill } },
+          gradientMidFill: { solid: { color: this.settings.area.gradientMidFill } },
+          gradientHighFill: { solid: { color: this.settings.area.gradientHighFill } }
         }
       } as any);
     }
@@ -1999,11 +2305,67 @@ export class Visual implements IVisual {
       } as any);
     }
 
+    if (options.objectName === NATIVE_AREA_COLORS_OBJECT) {
+      instances.push({
+        objectName: NATIVE_AREA_COLORS_OBJECT,
+        displayName: "Cor das areas",
+        selector: { data: [{ roles: ["category"] }] } as powerbi.data.Selector,
+        altConstantValueSelector: null as any,
+        propertyInstanceKind: {
+          [NATIVE_AREA_COLORS_PROPERTY]: powerbi.VisualEnumerationInstanceKinds.ConstantOrRule
+        },
+        properties: {
+          [NATIVE_AREA_COLORS_PROPERTY]: {
+            solid: { color: this.settings.area.matchedFill }
+          }
+        }
+      } as any);
+    }
+
     return instances;
   }
 
   public getFormattingModel(): powerbi.visuals.FormattingModel {
     return this.formattingSettingsService.buildFormattingModel(this.formattingSettingsModel);
+  }
+
+  private getGradientStats(rows: Array<Pick<CatRow, "value">>): GradientStats {
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+
+    for (const row of rows) {
+      if (!Number.isFinite(row.value)) continue;
+      min = Math.min(min, row.value as number);
+      max = Math.max(max, row.value as number);
+    }
+
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+    return { min, max };
+  }
+
+  private resolveGradientFillColor(value: number | null, matchedFill: string, stats: GradientStats): string {
+    const area = this.settings.area;
+    if (!Number.isFinite(value)) return matchedFill;
+    if (!stats) return matchedFill;
+    const { min, max } = stats;
+    if (min === max) return area.gradientMidFill;
+
+    const normalized = clamp(((value as number) - min) / (max - min), 0, 1);
+    if (normalized <= 0.5) {
+      return interpolateHexColor(area.gradientLowFill, area.gradientMidFill, normalized / 0.5);
+    }
+    return interpolateHexColor(area.gradientMidFill, area.gradientHighFill, (normalized - 0.5) / 0.5);
+  }
+
+  private resolveRowFillColor(
+    row: Pick<CatRow, "value" | "themeColor" | "nativeFill">,
+    matchedFill: string,
+    stats: GradientStats,
+    nativeFallbackFill?: string | null
+  ): string {
+    const mode = this.settings.area.colorMode === "Gradient" ? "Gradient" : "Solid";
+    if (mode === "Gradient") return this.resolveGradientFillColor(row.value, matchedFill, stats);
+    return row.nativeFill || nativeFallbackFill || matchedFill;
   }
 
   // ===== data parse =====
@@ -2028,8 +2390,10 @@ export class Visual implements IVisual {
 
     const metadataObjects = dv?.metadata?.objects as any;
     const staticMatchedOverride = tryGetFillColorFromObjects(metadataObjects, "area", "matchedFill");
+    const staticNativeFill = tryGetFillColorFromObjects(metadataObjects, NATIVE_AREA_COLORS_OBJECT, NATIVE_AREA_COLORS_PROPERTY) || null;
     const hasMatchedFillOverride = typeof staticMatchedOverride === "string" && staticMatchedOverride.length > 0;
     const staticMatchedFill = hasMatchedFillOverride ? staticMatchedOverride : this.settings.area.matchedFill;
+    const rows: CatRow[] = [];
 
     for (let i = 0; i < regionCol.values.length; i++) {
       const rawKey = String(regionCol.values[i] ?? "");
@@ -2038,6 +2402,7 @@ export class Visual implements IVisual {
       const colorKey = colorKeyRaw || rawKey;
       const legendRaw = legendCol ? String(legendCol.values[i] ?? "") : rawKey;
       const legendRawKey = legendRaw || rawKey;
+      const nativeObjects = regionCol.objects?.[i];
 
       const measureValRaw = measureCol ? (measureCol.values[i] as any) : null;
       const highlightVal = this.hasHighlights ? (highlightVals as any)?.[i] : undefined;
@@ -2061,30 +2426,36 @@ export class Visual implements IVisual {
       }
 
       const themeColor = this.getThemeColorForKey(colorKey);
-      const matchedColor = hasMatchedFillOverride ? staticMatchedFill : themeColor || staticMatchedFill;
+      const nativeFill = tryGetFillColorFromObjects(nativeObjects, NATIVE_AREA_COLORS_OBJECT, NATIVE_AREA_COLORS_PROPERTY) || null;
 
       if (this.hasHighlights && highlightVal !== null && highlightVal !== undefined) {
         this.highlightedKeys.add(key);
       }
 
-      this.dataMap.set(key, {
+      rows.push({
         key,
         rawKey,
         legendRawKey,
         colorKey,
-        value: isFinite(measureValNum as any) ? (measureValNum as number) : null,
+        value: Number.isFinite(measureValNum) ? measureValNum : null,
         fields,
         identity,
         idx: i,
-        matchedColor
+        themeColor,
+        nativeFill,
+        fillColor: hasMatchedFillOverride ? staticMatchedFill : themeColor || staticMatchedFill
       });
+    }
+
+    const gradientStats = this.getGradientStats(rows);
+    for (const row of rows) {
+      row.fillColor = this.resolveRowFillColor(row, staticMatchedFill, gradientStats, staticNativeFill);
+      this.dataMap.set(row.key, row);
     }
   }
 
   // ===== render =====
   private render(svgTextRaw: string, dv?: DataView) {
-    this.buildDataMap(dv);
-
     const svgText = decodeSvgDataUri(svgTextRaw);
     const svgSig = `${hashString(svgText)}_${svgText.length}`;
 
@@ -2107,6 +2478,8 @@ export class Visual implements IVisual {
     this.setSanitizationWarning(report, svgSig, this.warningForceShow);
 
     const svgNode = document.importNode(parsed, true) as SVGSVGElement;
+    const widthAttr = svgNode.getAttribute("width");
+    const heightAttr = svgNode.getAttribute("height");
 
     svgNode.removeAttribute("width");
     svgNode.removeAttribute("height");
@@ -2122,10 +2495,8 @@ export class Visual implements IVisual {
     svgNode.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
     if (!svgNode.getAttribute("viewBox")) {
-      const wAttr = svgNode.getAttribute("width");
-      const hAttr = svgNode.getAttribute("height");
-      const w = wAttr ? Number(String(wAttr).replace(/[^\d.]/g, "")) : NaN;
-      const h = hAttr ? Number(String(hAttr).replace(/[^\d.]/g, "")) : NaN;
+      const w = widthAttr ? Number(String(widthAttr).replace(/[^\d.]/g, "")) : NaN;
+      const h = heightAttr ? Number(String(heightAttr).replace(/[^\d.]/g, "")) : NaN;
       if (isFinite(w) && isFinite(h) && w > 0 && h > 0) {
         svgNode.setAttribute("viewBox", `0 0 ${w} ${h}`);
       }
@@ -2146,9 +2517,6 @@ export class Visual implements IVisual {
     svgNode.querySelectorAll("title").forEach((t) => t.remove());
 
     this.wireZoomPan();
-
-    this.computeFitTransform();
-    this.resetToFit();
 
     this.applyRegionsStyleAndEvents();
     if (!this.syncSelectionFromHighlights()) {
@@ -2276,7 +2644,7 @@ export class Visual implements IVisual {
       const row = this.dataMap.get(key);
 
       if (row) {
-        const baseFill = inHighContrast && hcPalette ? hcPalette.foreground : row.matchedColor || this.settings.area.matchedFill;
+        const baseFill = inHighContrast && hcPalette ? hcPalette.foreground : row.fillColor || this.settings.area.matchedFill;
         this.setRegionFill(el, baseFill);
         el.setAttribute("tabindex", "0");
         el.setAttribute("focusable", "true");
@@ -2296,6 +2664,7 @@ export class Visual implements IVisual {
       this.applyOutline(el);
 
       (el as any).style.cursor = row ? "pointer" : "default";
+      (el as any).style.outline = "none";
 
       el.addEventListener("mouseenter", (ev: MouseEvent) => {
         if (!row) return;
@@ -2374,7 +2743,7 @@ export class Visual implements IVisual {
         }
 
         const text = Number.isFinite(val) ? Math.round(val).toString() : String(val);
-        upsertLabel(el, text, row.matchedColor || this.settings.area.matchedFill, cfg);
+        upsertLabel(el, text, row.fillColor || this.settings.area.matchedFill, cfg);
       }
     } else {
       regionEls.forEach(removeLabel);

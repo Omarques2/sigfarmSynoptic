@@ -20,6 +20,11 @@ assert(
     capabilities.privileges.some((p) => p?.name === "LocalStorage"),
   "capabilities.json deve declarar o privilegio LocalStorage."
 );
+assert(
+  Array.isArray(capabilities.privileges) &&
+    !capabilities.privileges.some((p) => p?.name === "WebAccess"),
+  "capabilities.json nao deve declarar o privilegio WebAccess."
+);
 
 const visualTs = fs.readFileSync("src/visual.ts", "utf8");
 assert(!/localStorage\./.test(visualTs), "visual.ts nao deve acessar localStorage diretamente.");
@@ -27,6 +32,9 @@ assert(/storageService/.test(visualTs), "visual.ts deve usar storageService do h
 assert(/addEventListener\(\s*"keydown"/.test(visualTs), "visual.ts deve ter suporte de teclado para interacao.");
 assert(/setAttribute\(\s*"tabindex"\s*,\s*"0"\s*\)/.test(visualTs), "visual.ts deve expor elementos focaveis via teclado.");
 assert(/isHighContrast/.test(visualTs), "visual.ts deve tratar modo de alto contraste.");
+
+const pbiviz = JSON.parse(fs.readFileSync("pbiviz.json", "utf8"));
+assert.deepEqual(pbiviz.externalJS, [], "pbiviz.json deve manter externalJS vazio.");
 
 const size = readPngSize("assets/icon.png");
 assert.equal(size.width, 20, "assets/icon.png deve ter largura 20px.");
