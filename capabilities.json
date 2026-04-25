@@ -70,6 +70,138 @@
         }
       }
     },
+    "interaction": {
+      "displayName": "Interacao",
+      "properties": {
+        "autoFocusSelectedArea": { "displayName": "Focar area selecionada", "type": { "bool": true } },
+        "focusExternalSelection": { "displayName": "Focar selecao externa", "type": { "bool": true } },
+        "focusPadding": { "displayName": "Padding do foco (%)", "type": { "numeric": true } },
+        "focusAnimationMs": { "displayName": "Animacao do foco (ms)", "type": { "numeric": true } },
+        "unselectedOpacity": { "displayName": "Opacidade das areas nao selecionadas", "type": { "numeric": true } },
+        "labelUnselectedOpacity": { "displayName": "Opacidade dos rotulos nao selecionados", "type": { "numeric": true } }
+      }
+    },
+    "labels": {
+      "displayName": "Rotulos avancados",
+      "properties": {
+        "labelMode": {
+          "displayName": "Modo dos rotulos",
+          "type": {
+            "enumeration": [
+              { "displayName": "Interno", "value": "Inside" },
+              { "displayName": "Callout externo", "value": "OutsideCallout" }
+            ]
+          }
+        },
+        "labelContent": {
+          "displayName": "Conteudo",
+          "type": {
+            "enumeration": [
+              { "displayName": "Valor", "value": "Value" },
+              { "displayName": "Categoria", "value": "Category" },
+              { "displayName": "Categoria e valor", "value": "CategoryAndValue" }
+            ]
+          }
+        },
+        "calloutTextAlign": {
+          "displayName": "Alinhamento horizontal",
+          "type": {
+            "enumeration": [
+              { "displayName": "Esquerda", "value": "Left" },
+              { "displayName": "Centro", "value": "Center" },
+              { "displayName": "Direita", "value": "Right" }
+            ]
+          }
+        },
+        "calloutDistance": { "displayName": "Distancia do callout", "type": { "numeric": true } },
+        "calloutLineColor": { "displayName": "Cor da linha", "type": { "fill": { "solid": { "color": true } } } },
+        "calloutTextColor": { "displayName": "Cor do texto", "type": { "fill": { "solid": { "color": true } } } },
+        "calloutLineWidth": { "displayName": "Espessura da linha", "type": { "numeric": true } },
+        "calloutMinGap": { "displayName": "Espaco minimo entre callouts", "type": { "numeric": true } },
+        "calloutSideMode": {
+          "displayName": "Alinhamento dos callouts",
+          "type": {
+            "enumeration": [
+              { "displayName": "Direita", "value": "Right" },
+              { "displayName": "Esquerda", "value": "Left" },
+              { "displayName": "Superior", "value": "Top" },
+              { "displayName": "Inferior", "value": "Bottom" },
+              { "displayName": "Direita ou esquerda", "value": "HorizontalNearest" },
+              { "displayName": "Superior ou inferior", "value": "VerticalNearest" },
+              { "displayName": "Lado mais proximo", "value": "Nearest" },
+              { "displayName": "Usar lados permitidos", "value": "CustomSides" }
+            ]
+          }
+        },
+        "calloutRouteStyle": {
+          "displayName": "Estilo do conector",
+          "type": {
+            "enumeration": [
+              { "displayName": "Curva + reta", "value": "Curved" },
+              { "displayName": "Reto", "value": "Straight" }
+            ]
+          }
+        },
+        "calloutCurveSize": { "displayName": "Tamanho da curva", "type": { "numeric": true } },
+        "calloutAllowRight": { "displayName": "Permitir direita", "type": { "bool": true } },
+        "calloutAllowLeft": { "displayName": "Permitir esquerda", "type": { "bool": true } },
+        "calloutAllowTop": { "displayName": "Permitir superior", "type": { "bool": true } },
+        "calloutAllowBottom": { "displayName": "Permitir inferior", "type": { "bool": true } }
+      }
+    },
+    "mapRegistry": {
+      "displayName": "Registro de mapas",
+      "properties": {
+        "manifestJson": { "displayName": "Manifesto JSON", "type": { "text": true } }
+      }
+    },
+    "editor": {
+      "displayName": "Editor avancado",
+      "properties": {
+        "enabled": { "displayName": "Habilitar editor", "type": { "bool": true } },
+        "showEditorButton": { "displayName": "Mostrar botao Editor", "type": { "bool": true } },
+        "showManifestEditor": { "displayName": "Mostrar manifesto", "type": { "bool": true } }
+      }
+    },
+    "drillMaps": {
+      "displayName": "Drill de mapas",
+      "properties": {
+        "enabled": { "displayName": "Habilitar mapas por drill", "type": { "bool": true } },
+        "fallbackToDefaultMap": { "displayName": "Usar mapa padrao como fallback", "type": { "bool": true } },
+        "noDataBehavior": {
+          "displayName": "Areas sem dado no drill",
+          "type": {
+            "enumeration": [
+              { "displayName": "Desvanecer", "value": "Fade" },
+              { "displayName": "Ocultar", "value": "Hide" }
+            ]
+          }
+        },
+        "focusDataAreas": { "displayName": "Focar areas com dado", "type": { "bool": true } },
+        "preFocusSourceOnDrill": { "displayName": "Pre-focar area antes do drill", "type": { "bool": true } },
+        "normalizeDrillFocus": { "displayName": "Normalizar foco do drill", "type": { "bool": true } },
+        "drillRenderScopeMode": {
+          "displayName": "Escopo renderizado no drill",
+          "type": {
+            "enumeration": [
+              { "displayName": "Somente areas com dado", "value": "DrillDataOnly" },
+              { "displayName": "Mapa completo", "value": "AllMapAreas" }
+            ]
+          }
+        },
+        "drillMinFocusScale": { "displayName": "Zoom minimo do drill", "type": { "numeric": true } },
+        "drillFocusPaddingPct": { "displayName": "Padding do drill (%)", "type": { "numeric": true } },
+        "drillTargetAreaScreenPx": { "displayName": "Tamanho alvo da area (px)", "type": { "numeric": true } },
+        "drillAreaScalePercentile": { "displayName": "Percentil da area alvo", "type": { "numeric": true } },
+        "drillMaxFocusScale": { "displayName": "Zoom maximo do drill", "type": { "numeric": true } }
+      }
+    },
+    "labelOverrides": {
+      "displayName": "Overrides de rotulos",
+      "properties": {
+        "overridesJson": { "displayName": "Overrides JSON", "type": { "text": true } }
+      }
+    },
     "svgSettings": {
       "displayName": "SVG",
       "properties": {
@@ -81,7 +213,37 @@
         "labelMin": { "displayName": "Tamanho mínimo (px)", "type": { "numeric": true } },
         "labelMax": { "displayName": "Tamanho máximo (px)", "type": { "numeric": true } },
         "labelBold": { "displayName": "Negrito", "type": { "bool": true } },
-        "labelOutlineFactor": { "displayName": "Contorno (% do tamanho)", "type": { "numeric": true } }
+        "labelOutlineFactor": { "displayName": "Contorno (% do tamanho)", "type": { "numeric": true } },
+        "labelScaleMode": {
+          "displayName": "Escala do rótulo",
+          "type": {
+            "enumeration": [
+              { "displayName": "Tamanho fixo na tela", "value": "FixedScreenSize" },
+              { "displayName": "Escalar com o mapa", "value": "ScaleWithMap" }
+            ]
+          }
+        },
+        "labelMinScreenPx": { "displayName": "Mínimo na tela (px)", "type": { "numeric": true } },
+        "labelMaxScreenPx": { "displayName": "Máximo na tela (px)", "type": { "numeric": true } },
+        "labelHideBelowAreaPx": { "displayName": "Ocultar se área menor que (px)", "type": { "numeric": true } },
+        "labelDenseMode": {
+          "displayName": "Rótulos em mapas densos",
+          "type": {
+            "enumeration": [
+              { "displayName": "Somente com dados", "value": "DataOnly" },
+              { "displayName": "Somente selecionadas", "value": "SelectedOnly" },
+              { "displayName": "Ocultar", "value": "Hidden" },
+              { "displayName": "Todos", "value": "All" }
+            ]
+          }
+        }
+      }
+    },
+    "performance": {
+      "displayName": "Performance",
+      "properties": {
+        "denseModeEnabled": { "displayName": "Modo denso automático", "type": { "bool": true } },
+        "denseAreaThreshold": { "displayName": "Limite de áreas para modo denso", "type": { "numeric": true } }
       }
     },
     "outline": {
@@ -145,7 +307,7 @@
   "supportsHighlight": true,
   "drilldown": { "roles": ["category"] },
   "suppressDefaultTitle": false,
-  "advancedEditModeSupport": 1,
+  "advancedEditModeSupport": 2,
   "privileges": [
     {
       "name": "LocalStorage",

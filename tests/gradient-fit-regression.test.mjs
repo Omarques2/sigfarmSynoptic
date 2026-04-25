@@ -104,10 +104,10 @@ assert(
   "computeFitTransform nao pode permanecer como identidade fixa."
 );
 assert(
-  /this\.render\(svgText,\s*dv\);[\s\S]{0,260}this\.updateLegend\(dv,\s*hasSvg\);[\s\S]{0,260}this\.computeFitTransform\(\);[\s\S]{0,120}this\.resetToFit\(\);/.test(
+  /this\.render\(svgText,\s*dv\);[\s\S]{0,260}this\.updateLegend\(dv,\s*hasSvg\);[\s\S]{0,360}this\.computeFitTransform\(\);[\s\S]{0,180}this\.scheduleFitToHost\(\);/.test(
     visualTs
   ),
-  "update() deve recalcular fit apos updateLegend e antes de resetToFit."
+  "update() deve recalcular fit apos updateLegend e delegar reset/foco para scheduleFitToHost."
 );
 
 console.log("Gradient and fit regression checks passed.");
