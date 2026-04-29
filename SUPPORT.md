@@ -1,6 +1,6 @@
-# Support - Sigfarm Geosynoptic
+# Support - SVG Synoptic Map
 
-For help with the Sigfarm Geosynoptic Power BI visual, use the channels below.
+For help with the SVG Synoptic Map Power BI visual, use channels below.
 
 ## Contact
 - Email: contato@sigfarmintelligence.com

@@ -393,6 +393,40 @@ try {
   }
 
   {
+    const maps = [
+      { mapId: "default", level: 0, svgText: "<svg><path id='SP'/><path id='MG'/></svg>" },
+      {
+        mapId: "Brasil_municipios_MG",
+        level: 1,
+        drillPath: ["MG"],
+        svgText: "<svg><path id='Planura_MG'/><path id='Conceição_das_Alagoas_MG'/></svg>"
+      },
+      {
+        mapId: "Planura_MG_bairros",
+        level: 2,
+        drillPath: ["MG", "Planura_MG"],
+        svgText: "<svg><path id='Centro_Planura_MG'/><path id='Bairro_sem_dados'/></svg>"
+      }
+    ];
+
+    const unresolved = resolveDrillMap(
+      { defaultMapId: "default", maps },
+      {
+        currentDrillPath: ["Estado", "Municipio", "Bairro", "Casa"],
+        currentDrillValuePath: ["MG", "Planura_MG", "Bairro_sem_dados"],
+        currentLevel: 3,
+        categoryFieldNames: ["Estado", "Municipio", "Bairro", "Casa"],
+        requireExplicitDrillPath: true
+      },
+      options
+    );
+
+    assert.equal(unresolved.mapId, null);
+    assert.equal(unresolved.reason, "none");
+    assert.notEqual(unresolved.mapId, "default");
+  }
+
+  {
     const maps = baseMaps.filter((map) => !["path", "level", "override"].includes(map.mapId));
     const result = resolveDrillMap(
       { defaultMapId: "default", maps },

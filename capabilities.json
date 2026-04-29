@@ -1,9 +1,9 @@
 {
   "dataRoles": [
-    { "displayName": "Região (ID do SVG)", "name": "category", "kind": "Grouping" },
-    { "displayName": "Legenda", "name": "legend", "kind": "Grouping" },
-    { "displayName": "Valor", "name": "measure", "kind": "Measure" },
-    { "displayName": "Tooltips", "name": "tooltips", "kind": "Measure" }
+    { "displayName": "Região (ID do SVG)", "displayNameKey": "Visual_Category", "name": "category", "kind": "Grouping" },
+    { "displayName": "Legenda", "displayNameKey": "Visual_Legend", "name": "legend", "kind": "Grouping" },
+    { "displayName": "Valor", "displayNameKey": "Visual_Measure", "name": "measure", "kind": "Measure" },
+    { "displayName": "Tooltips", "displayNameKey": "Visual_Tooltips", "name": "tooltips", "kind": "Measure" }
   ],
   "dataViewMappings": [
     {
@@ -27,9 +27,11 @@
   "objects": {
     "area": {
       "displayName": "Mapa",
+      "displayNameKey": "Card_Map",
       "properties": {
         "colorMode": {
           "displayName": "Modo de cor",
+          "displayNameKey": "Slice_ColorMode",
           "type": {
             "enumeration": [
               { "displayName": "Tema do Power BI", "value": "Theme" },
@@ -40,22 +42,27 @@
         },
         "unmatchedFill": {
           "displayName": "Cor (sem correspondência)",
+          "displayNameKey": "Slice_UnmatchedFill",
           "type": { "fill": { "solid": { "color": true } } }
         },
         "matchedFill": {
           "displayName": "Cor das áreas",
+          "displayNameKey": "Slice_MatchedFill",
           "type": { "fill": { "solid": { "color": true } } }
         },
         "gradientLowFill": {
           "displayName": "Valor baixo",
+          "displayNameKey": "Slice_GradientLow",
           "type": { "fill": { "solid": { "color": true } } }
         },
         "gradientMidFill": {
           "displayName": "Valor médio",
+          "displayNameKey": "Slice_GradientMid",
           "type": { "fill": { "solid": { "color": true } } }
         },
         "gradientHighFill": {
           "displayName": "Valor alto",
+          "displayNameKey": "Slice_GradientHigh",
           "type": { "fill": { "solid": { "color": true } } }
         }
       }
@@ -71,20 +78,23 @@
     },
     "interaction": {
       "displayName": "Interacao",
+      "displayNameKey": "Card_Interaction",
       "properties": {
-        "autoFocusSelectedArea": { "displayName": "Focar area selecionada", "type": { "bool": true } },
-        "focusExternalSelection": { "displayName": "Focar selecao externa", "type": { "bool": true } },
-        "focusPadding": { "displayName": "Padding do foco (%)", "type": { "numeric": true } },
-        "focusAnimationMs": { "displayName": "Animacao do foco (ms)", "type": { "numeric": true } },
-        "unselectedOpacity": { "displayName": "Opacidade das areas nao selecionadas", "type": { "numeric": true } },
-        "labelUnselectedOpacity": { "displayName": "Opacidade dos rotulos nao selecionados", "type": { "numeric": true } }
+        "autoFocusSelectedArea": { "displayName": "Focar area selecionada", "displayNameKey": "Slice_InteractionAutoFocus", "type": { "bool": true } },
+        "focusExternalSelection": { "displayName": "Focar selecao externa", "displayNameKey": "Slice_InteractionExternalFocus", "type": { "bool": true } },
+        "focusPadding": { "displayName": "Padding do foco (%)", "displayNameKey": "Slice_InteractionPadding", "type": { "numeric": true } },
+        "focusAnimationMs": { "displayName": "Animacao do foco (ms)", "displayNameKey": "Slice_InteractionAnimation", "type": { "numeric": true } },
+        "unselectedOpacity": { "displayName": "Opacidade das areas nao selecionadas", "displayNameKey": "Slice_InteractionUnselectedOpacity", "type": { "numeric": true } },
+        "labelUnselectedOpacity": { "displayName": "Opacidade dos rotulos nao selecionados", "displayNameKey": "Slice_InteractionLabelUnselectedOpacity", "type": { "numeric": true } }
       }
     },
     "labels": {
       "displayName": "Rotulos avancados",
+      "displayNameKey": "Card_ExternalLabels",
       "properties": {
         "labelMode": {
           "displayName": "Modo dos rotulos",
+          "displayNameKey": "Slice_LabelMode",
           "type": {
             "enumeration": [
               { "displayName": "Interno", "value": "Inside" },
@@ -94,6 +104,7 @@
         },
         "labelContent": {
           "displayName": "Conteudo",
+          "displayNameKey": "Slice_LabelContent",
           "type": {
             "enumeration": [
               { "displayName": "Valor", "value": "Value" },
@@ -112,10 +123,10 @@
             ]
           }
         },
-        "calloutDistance": { "displayName": "Distancia do callout", "type": { "numeric": true } },
-        "calloutLineColor": { "displayName": "Cor da linha", "type": { "fill": { "solid": { "color": true } } } },
-        "calloutTextColor": { "displayName": "Cor do texto", "type": { "fill": { "solid": { "color": true } } } },
-        "calloutLineWidth": { "displayName": "Espessura da linha", "type": { "numeric": true } },
+        "calloutDistance": { "displayName": "Distancia do callout", "displayNameKey": "Slice_CalloutDistance", "type": { "numeric": true } },
+        "calloutLineColor": { "displayName": "Cor da linha", "displayNameKey": "Slice_CalloutLineColor", "type": { "fill": { "solid": { "color": true } } } },
+        "calloutTextColor": { "displayName": "Cor do texto", "displayNameKey": "Slice_CalloutTextColor", "type": { "fill": { "solid": { "color": true } } } },
+        "calloutLineWidth": { "displayName": "Espessura da linha", "displayNameKey": "Slice_CalloutLineWidth", "type": { "numeric": true } },
         "calloutMinGap": { "displayName": "Espaco minimo entre callouts", "type": { "numeric": true } },
         "calloutSideMode": {
           "displayName": "Alinhamento dos callouts",
@@ -134,6 +145,7 @@
         },
         "calloutRouteStyle": {
           "displayName": "Estilo do conector",
+          "displayNameKey": "Slice_CalloutRouteStyle",
           "type": {
             "enumeration": [
               { "displayName": "Curva + reta", "value": "Curved" },
@@ -142,10 +154,10 @@
           }
         },
         "calloutCurveSize": { "displayName": "Tamanho da curva", "type": { "numeric": true } },
-        "calloutAllowRight": { "displayName": "Direita", "type": { "bool": true } },
-        "calloutAllowLeft": { "displayName": "Esquerda", "type": { "bool": true } },
-        "calloutAllowTop": { "displayName": "Cima", "type": { "bool": true } },
-        "calloutAllowBottom": { "displayName": "Baixo", "type": { "bool": true } }
+        "calloutAllowRight": { "displayName": "Direita", "displayNameKey": "Slice_CalloutAllowRight", "type": { "bool": true } },
+        "calloutAllowLeft": { "displayName": "Esquerda", "displayNameKey": "Slice_CalloutAllowLeft", "type": { "bool": true } },
+        "calloutAllowTop": { "displayName": "Cima", "displayNameKey": "Slice_CalloutAllowTop", "type": { "bool": true } },
+        "calloutAllowBottom": { "displayName": "Baixo", "displayNameKey": "Slice_CalloutAllowBottom", "type": { "bool": true } }
       }
     },
     "mapRegistry": {
@@ -156,19 +168,22 @@
     },
     "editor": {
       "displayName": "Editor avancado",
+      "displayNameKey": "Card_Editor",
       "properties": {
         "enabled": { "displayName": "Habilitar editor", "type": { "bool": true } },
-        "showEditorButton": { "displayName": "Mostrar botao Editor", "type": { "bool": true } },
+        "showEditorButton": { "displayName": "Mostrar botao Editor", "displayNameKey": "Slice_ShowEditorButton", "type": { "bool": true } },
         "showManifestEditor": { "displayName": "Mostrar manifesto", "type": { "bool": true } }
       }
     },
     "drillMaps": {
       "displayName": "Drill de mapas",
+      "displayNameKey": "Card_DrillPath",
       "properties": {
-        "enabled": { "displayName": "Habilitar mapas por drill", "type": { "bool": true } },
+        "enabled": { "displayName": "Habilitar mapas por drill", "displayNameKey": "Slice_DrillEnabled", "type": { "bool": true } },
         "fallbackToDefaultMap": { "displayName": "Usar mapa padrao como fallback", "type": { "bool": true } },
         "noDataBehavior": {
           "displayName": "Areas sem dado no drill",
+          "displayNameKey": "Slice_DrillNoDataBehavior",
           "type": {
             "enumeration": [
               { "displayName": "Desvanecer", "value": "Fade" },
@@ -176,7 +191,7 @@
             ]
           }
         },
-        "focusDataAreas": { "displayName": "Focar areas com dado", "type": { "bool": true } },
+        "focusDataAreas": { "displayName": "Focar areas com dado", "displayNameKey": "Slice_DrillFocusData", "type": { "bool": true } },
         "preFocusSourceOnDrill": { "displayName": "Pre-focar area antes do drill", "type": { "bool": true } },
         "normalizeDrillFocus": { "displayName": "Normalizar foco do drill", "type": { "bool": true } },
         "drillRenderScopeMode": {
@@ -247,18 +262,21 @@
     },
     "outline": {
       "displayName": "Contorno",
+      "displayNameKey": "Card_Outline",
       "properties": {
-        "show": { "displayName": "Mostrar", "type": { "bool": true } },
-        "color": { "displayName": "Cor", "type": { "fill": { "solid": { "color": true } } } },
-        "width": { "displayName": "Espessura (px)", "type": { "numeric": true } }
+        "show": { "displayName": "Mostrar", "displayNameKey": "Slice_OutlineShow", "type": { "bool": true } },
+        "color": { "displayName": "Cor", "displayNameKey": "Slice_OutlineColor", "type": { "fill": { "solid": { "color": true } } } },
+        "width": { "displayName": "Espessura (px)", "displayNameKey": "Slice_OutlineWidth", "type": { "numeric": true } }
       }
     },
     "legend": {
       "displayName": "Legenda",
+      "displayNameKey": "Card_Legend",
       "properties": {
-        "show": { "displayName": "Mostrar", "type": { "bool": true } },
+        "show": { "displayName": "Mostrar", "displayNameKey": "Slice_LegendShow", "type": { "bool": true } },
         "position": {
           "displayName": "Posicao",
+          "displayNameKey": "Slice_LegendPosition",
           "type": {
             "enumeration": [
               { "displayName": "Superior", "value": "Top" },
@@ -268,9 +286,9 @@
             ]
           }
         },
-        "title": { "displayName": "Titulo", "type": { "text": true } },
-        "labelColor": { "displayName": "Cor do texto", "type": { "fill": { "solid": { "color": true } } } },
-        "fontSize": { "displayName": "Tamanho do texto (px)", "type": { "numeric": true } }
+        "title": { "displayName": "Titulo", "displayNameKey": "Slice_LegendTitle", "type": { "text": true } },
+        "labelColor": { "displayName": "Cor do texto", "displayNameKey": "Slice_LegendLabelColor", "type": { "fill": { "solid": { "color": true } } } },
+        "fontSize": { "displayName": "Tamanho do texto (px)", "displayNameKey": "Slice_LegendFontSize", "type": { "numeric": true } }
       }
     },
     "help": {

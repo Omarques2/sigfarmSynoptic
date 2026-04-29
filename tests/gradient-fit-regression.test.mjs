@@ -70,11 +70,11 @@ assert(
 const visualTs = fs.readFileSync("src/visual.ts", "utf8");
 assert(/colorMode/.test(visualTs), "visual.ts deve considerar colorMode.");
 assert(
-  /this\.settings\.area\.colorMode\s*===\s*"Gradient"/.test(visualTs),
+  /mode\s*===\s*"Gradient"/.test(visualTs) || /colorMode\s*===\s*"Gradient"/.test(visualTs),
   "visual.ts deve ter branch explicito para o modo Gradient."
 );
 assert(
-  /this\.settings\.area\.colorMode\s*===\s*"Theme"/.test(visualTs),
+  /mode\s*===\s*"Theme"/.test(visualTs) || /colorMode\s*===\s*"Theme"/.test(visualTs),
   "visual.ts deve ter branch explicito para o modo Theme."
 );
 assert(
@@ -91,9 +91,9 @@ assert(
   "visual.ts deve cair para matchedFill quando o valor nao for numerico no modo Gradient."
 );
 assert(
-  /this\.settings\.area\.colorMode\s*===\s*"Gradient"[\s\S]{0,260}this\.legendHost\.style\.display\s*=\s*"none"/.test(visualTs) ||
-    /this\.legendHost\.style\.display\s*=\s*"none"[\s\S]{0,260}this\.settings\.area\.colorMode\s*===\s*"Gradient"/.test(visualTs),
-  "visual.ts deve esconder a legenda categórica quando colorMode = Gradient."
+  !/this\.settings\.area\.colorMode\s*===\s*"Gradient"[\s\S]{0,260}this\.legendHost\.style\.display\s*=\s*"none"/.test(visualTs) &&
+    !/this\.legendHost\.style\.display\s*=\s*"none"[\s\S]{0,260}this\.settings\.area\.colorMode\s*===\s*"Gradient"/.test(visualTs),
+  "visual.ts nao deve esconder a legenda automaticamente quando colorMode = Gradient."
 );
 assert(
   /getBBox\(\)/.test(visualTs),

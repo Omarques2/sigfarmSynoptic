@@ -1,19 +1,29 @@
 {
-  "name": "visual",
-  "description": "default_template_value",
-  "version": "1.0.0.11",
+  "name": "sigfarm-geosynoptic",
+  "description": "Power BI custom visual for SVG synoptic maps with theme colors, conditional fills, labels, drill-aware map registry, and certified-safe SVG sanitization.",
+  "version": "1.0.0.12",
   "repository": {
-    "type": "default_template_value",
-    "url": "default_template_value"
+    "type": "git",
+    "url": "git+https://github.com/Omarques2/sigfarmSynoptic.git"
+  },
+  "homepage": "https://github.com/Omarques2/sigfarmSynoptic/tree/certification",
+  "bugs": {
+    "url": "https://github.com/Omarques2/sigfarmSynoptic/issues"
+  },
+  "overrides": {
+    "uuid": "^14.0.0"
   },
   "license": "MIT",
   "scripts": {
-    "pbiviz": "pbiviz",
-    "start": "pbiviz start",
-    "package": "pbiviz package --certification-fix",
-    "package:audit": "pbiviz package --certification-audit",
+    "pbiviz": "npx pbiviz",
+    "start": "npx pbiviz start",
+    "package": "npx pbiviz package",
+    "package:audit": "npx pbiviz package --certification-audit",
     "eslint": "npx eslint . --ext .js,.jsx,.ts,.tsx",
-    "lint": "npx eslint ."
+    "lint": "npm run eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.mjs",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm audit --audit-level=moderate && npm run package:audit && npm run package"
   },
   "dependencies": {
     "@types/d3": "7.4.3",
@@ -25,6 +35,7 @@
     "@typescript-eslint/eslint-plugin": "^8.8.0",
     "eslint": "^9.11.1",
     "eslint-plugin-powerbi-visuals": "^1.0.0",
+    "powerbi-visuals-tools": "^7.0.3",
     "typescript": "5.5.4"
   }
 }

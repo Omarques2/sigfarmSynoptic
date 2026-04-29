@@ -1,13 +1,13 @@
-# EULA - Sigfarm Geosynoptic
+# EULA - SVG Synoptic Map
 
 Last updated: 2025-01-12
 
 This End User License Agreement ("EULA") is between Sigfarm Intelligence ("Licensor") and you ("User").
 
-By installing, copying, accessing, or using the Sigfarm Geosynoptic Power BI visual ("Software"), you agree to the terms below. If you do not agree, do not install or use the Software.
+By installing, copying, accessing, or using the SVG Synoptic Map Power BI visual ("Software"), you agree to the terms below. If you do not agree, do not install or use the Software.
 
 ## 1. Definitions
-- "Software": the Sigfarm Geosynoptic Power BI visual and its components.
+- "Software": the SVG Synoptic Map Power BI visual and its components.
 - "Service": any support, update, or content associated with the Software.
 
 ## 2. License grant
@@ -23,10 +23,10 @@ The User may not:
 The Software is owned by the Licensor and protected by intellectual property laws. This EULA does not transfer ownership rights to the User.
 
 ## 5. Support and updates
-Support is provided according to support via email during business hours. The Licensor may provide updates at its discretion.
+Support is provided via email during business hours. The Licensor may provide updates at its discretion.
 
 ## 6. Privacy
-Personal data handling follows the Privacy Policy available at https://www.sigfarmintelligence.com/about.
+Personal data handling follows the Privacy Policy available in this repository and through official support channels.
 
 ## 7. Disclaimer of warranties
 The Software is provided "as is", without warranties of any kind, express or implied, including fitness for a particular purpose.

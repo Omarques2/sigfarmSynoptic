@@ -1,88 +1,93 @@
-# Sigfarm Geosynoptic (Power BI Custom Visual)
+# SVG Synoptic Map (Power BI Custom Visual)
 
-Custom visual for Power BI that renders SVG synoptic panels with:
-- Conditional coloring by category
-- Power BI theme palette, solid fill or gradient fill by measure
-- Value labels
-- Selection and cross-filter interaction
-- Zoom and pan
+Power BI custom visual for SVG synoptic maps with:
+- Power BI theme palette, solid fill, or gradient fill by value
 - Legend grouping
-- Auto-fit based on the real SVG content bounds
-- Sanitization of SVG input
-- Auto-focus on selected areas
-- External callout labels
-- Advanced edit mode for map bindings, aliases, metadata and manifest JSON
+- Internal labels and external callout labels
+- Selection, cross-filter, zoom, and pan
 - Drill-aware map registry
+- Advanced map editor for supported authoring contexts
+- Certified-safe SVG sanitization
 
-## Color Modes
+## Data roles
 
-The visual supports three area color modes in the format pane:
-- `Theme`: uses the current Power BI theme palette. When `Legenda` is filled, it is used as the preferred theme color key; otherwise the visual uses the region/area key. This is the default so the visual follows the report theme and other visuals.
-- `Solid`: applies "Cor das areas" to matched areas. This picker exposes the native Power BI `fx` button, so rules, gradients and field-value/DAX conditional colors can resolve per area.
-- `Gradient`: uses the current measure to interpolate a three-color continuous scale from low to mid to high.
-
-Gradient defaults:
-- Low: `#FFF4B8`
-- Mid: `#B9DCFF`
-- High: `#1F5AA6`
-
-Gradient behavior:
-- Unmatched areas still use `unmatchedFill`.
-- Matched areas with missing or non-numeric values fall back to `matchedFill`.
-- When all numeric values are equal, matched areas use the mid gradient color.
-- The categorical legend is hidden while gradient mode is active to avoid a misleading discrete legend.
-
-Native conditional formatting behavior:
-- Unmatched areas still use `unmatchedFill`.
-- Matched areas first use the color resolved by Power BI for that area.
-- If Power BI doesn't resolve a color for a matched area, the visual falls back to `matchedFill`.
-
-## Data Roles
-
-`Adicionar dados ao seu visual` should be configured with:
+Configure `Adicionar dados ao seu visual` with:
 - `Região (ID do SVG)`: required
-- `Legenda`: optional, used by the legend and as the preferred theme color key
-- `Valor`: optional, used for values, gradients and primary numeric labels
-- `Tooltips`: optional
+- `Legenda`: optional, used by legend and preferred theme color key
+- `Valor`: optional, used for gradient, labels, and numeric tooltip content
+- `Tooltips`: optional extra tooltip fields
 
-There is no separate color bucket. Theme colors come from the Power BI theme plus `Legenda` or `Região`.
+There is no separate color bucket.
 
-## Interaction and Labels
+## Color modes
 
-The interaction card can automatically focus the selected area by fitting the selected SVG geometry to the visual viewport. External cross-filter focus is disabled by default to avoid unexpected map jumps when another visual filters this one.
+- `Theme`: uses Power BI theme palette. If `Legenda` exists, it is preferred as color key; otherwise the visual uses region key.
+- `Solid`: uses configured area color and supports native Power BI `fx` conditional formatting.
+- `Gradient`: uses `Valor` to interpolate low-mid-high colors.
 
-When an area is selected, other labels stay visible with reduced opacity instead of disappearing. Label mode can be changed from internal labels to external callouts with leader lines. Callouts can show value, category, or category plus value, and still respect high contrast mode.
+## Security and certification constraints
 
-## SVG Fit and Centering
+- No `WebAccess`
+- No `externalJS`
+- No remote maps or remote images
+- Scripts, event handlers, unsafe tags, and unsafe URL refs are removed from SVG
+- `LocalStorage` is used only through Power BI host `storageService` for local UI state
 
-The visual now computes fit and centering from the real `getBBox()` bounds of the rendered SVG content instead of relying only on the root `viewBox`. This keeps offset drawings centered more accurately, including when the visual is shown alone in focus mode or fullscreen inside Power BI.
+Embedded image policy:
+- Prefer no images inside SVG
+- If image is truly needed, use embedded `data:image/png`
+- External image URLs are blocked
+- `data:image/svg+xml` is blocked
 
-## Advanced Editor and Map Registry
-
-The visual supports Power BI Advanced Edit Mode in focus mode. The editor is binding-first: it is intended for SVG IDs, virtual IDs, binding overrides, aliases, per-area metadata, drill map associations and label overrides. It does not edit SVG geometry in this version.
-
-The map registry is a versioned JSON manifest persisted in the report. Multiple maps can be associated with drill levels or drill paths. Import uses a local JSON file or pasted text; export is done by selecting/copying the JSON. No remote maps, web access or external resources are used.
-
-## Repository Scope
-
-This repository contains the source code for the `Sigfarm Geosynoptic` custom visual package (`.pbiviz`).
-
-## Build
+## Build and verification
 
 ```powershell
-npm install
-npm run package
+npm ci
+npm run verify
 ```
 
-Generated package output:
+Key commands:
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm audit --audit-level=moderate`
+- `npm run package:audit`
+- `npm run package`
+
+Generated package:
 - `dist/*.pbiviz`
+
+## Sample file
+
+Sample report must:
+- use same production package version as submitted `.pbiviz`
+- work offline
+- include final `Hints & Tips` page inside PBIX
+
+Source content for that page lives in:
+- [`docs/sample-hints-and-tips.md`](./docs/sample-hints-and-tips.md)
+
+Security-focused SVG samples live in:
+- [`samples/certificacao`](./samples/certificacao)
+
+## Help and tutorial
+
+Visual includes local `i` tutorial overlay as complementary guidance.
+
+Important:
+- tutorial does not replace `Hints & Tips` page inside sample PBIX
+- tutorial uses local content only
+- no remote assets are required for onboarding
+
+## Compatibility
+
+Backward-compatibility notes for update from certified package:
+- [`docs/compatibility-matrix.md`](./docs/compatibility-matrix.md)
 
 ## Support
 
-Support details are available at:
 - [`SUPPORT.md`](./SUPPORT.md)
 
 ## Security
 
-Security policy and reporting instructions are available at:
 - [`SECURITY.md`](./SECURITY.md)

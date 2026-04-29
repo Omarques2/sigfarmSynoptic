@@ -525,10 +525,12 @@ class ObjectBoundColorPicker extends formattingSettings.ColorPicker {
 export class AreaFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "area";
   public displayName: string = "Mapa";
+  public displayNameKey: string = "Card_Map";
 
   public colorMode = new formattingSettings.ItemDropdown({
     name: "colorMode",
     displayName: "Modo de cor",
+    displayNameKey: "Slice_ColorMode",
     items: [
       { value: "Theme", displayName: "Tema do Power BI" },
       { value: "Solid", displayName: "Cor simples" },
@@ -540,12 +542,14 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
   public unmatchedFill = new formattingSettings.ColorPicker({
     name: "unmatchedFill",
     displayName: "Cor sem correspondencia",
+    displayNameKey: "Slice_UnmatchedFill",
     value: { value: "#D3D3D3" }
   });
 
   public matchedFill = new ObjectBoundColorPicker({
     name: "fill",
     displayName: "Cor das areas",
+    displayNameKey: "Slice_MatchedFill",
     value: { value: "#4CAF50" },
     objectNameOverride: "nativeAreaColors",
     selector: { data: [{ roles: ["category"] }] } as powerbi.data.Selector,
@@ -556,18 +560,21 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
   public gradientLowFill = new formattingSettings.ColorPicker({
     name: "gradientLowFill",
     displayName: "Valor baixo",
+    displayNameKey: "Slice_GradientLow",
     value: { value: "#FFF4B8" }
   });
 
   public gradientMidFill = new formattingSettings.ColorPicker({
     name: "gradientMidFill",
     displayName: "Valor medio",
+    displayNameKey: "Slice_GradientMid",
     value: { value: "#B9DCFF" }
   });
 
   public gradientHighFill = new formattingSettings.ColorPicker({
     name: "gradientHighFill",
     displayName: "Valor alto",
+    displayNameKey: "Slice_GradientHigh",
     value: { value: "#1F5AA6" }
   });
 
@@ -602,6 +609,7 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
 export class SvgFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "svgSettings";
   public displayName: string = "Rótulos";
+  public displayNameKey: string = "Card_Labels";
 
   public svgText = new formattingSettings.TextArea({
     name: "svgText",
@@ -626,36 +634,42 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
   public labelShow = new formattingSettings.ToggleSwitch({
     name: "labelShow",
     displayName: "Mostrar rótulos",
+    displayNameKey: "Slice_ShowLabels",
     value: true
   });
 
   public labelMin = new formattingSettings.NumUpDown({
     name: "labelMin",
     displayName: "Tamanho mínimo",
+    displayNameKey: "Slice_LabelMin",
     value: 9
   });
 
   public labelMax = new formattingSettings.NumUpDown({
     name: "labelMax",
     displayName: "Tamanho máximo",
+    displayNameKey: "Slice_LabelMax",
     value: 26
   });
 
   public labelBold = new formattingSettings.ToggleSwitch({
     name: "labelBold",
     displayName: "Negrito",
+    displayNameKey: "Slice_LabelBold",
     value: true
   });
 
   public labelOutlineFactor = new formattingSettings.NumUpDown({
     name: "labelOutlineFactor",
     displayName: "Contorno (% do tamanho)",
+    displayNameKey: "Slice_LabelOutline",
     value: 0.12
   });
 
   public labelScaleMode = new formattingSettings.ItemDropdown({
     name: "labelScaleMode",
     displayName: "Escala do texto",
+    displayNameKey: "Slice_LabelScaleMode",
     items: [
       { value: "FixedScreenSize", displayName: "Tamanho fixo na tela" },
       { value: "ScaleWithMap", displayName: "Escalar com o mapa" }
@@ -666,24 +680,28 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
   public labelMinScreenPx = new formattingSettings.NumUpDown({
     name: "labelMinScreenPx",
     displayName: "Mín. na tela",
+    displayNameKey: "Slice_LabelMinScreen",
     value: 8
   });
 
   public labelMaxScreenPx = new formattingSettings.NumUpDown({
     name: "labelMaxScreenPx",
     displayName: "Máx. na tela",
+    displayNameKey: "Slice_LabelMaxScreen",
     value: 22
   });
 
   public labelHideBelowAreaPx = new formattingSettings.NumUpDown({
     name: "labelHideBelowAreaPx",
     displayName: "Ocultar em áreas pequenas",
+    displayNameKey: "Slice_LabelHideBelow",
     value: 0
   });
 
   public labelDenseMode = new formattingSettings.ItemDropdown({
     name: "labelDenseMode",
     displayName: "Modo em mapas densos",
+    displayNameKey: "Slice_LabelDenseMode",
     items: [
       { value: "DataOnly", displayName: "Somente com dados" },
       { value: "SelectedOnly", displayName: "Somente selecionadas" },
@@ -710,22 +728,26 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
 export class OutlineFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "outline";
   public displayName: string = "Contorno";
+  public displayNameKey: string = "Card_Outline";
 
   public show = new formattingSettings.ToggleSwitch({
     name: "show",
     displayName: "Mostrar contorno",
+    displayNameKey: "Slice_OutlineShow",
     value: false
   });
 
   public color = new formattingSettings.ColorPicker({
     name: "color",
     displayName: "Cor",
+    displayNameKey: "Slice_OutlineColor",
     value: { value: "#000000" }
   });
 
   public width = new formattingSettings.NumUpDown({
     name: "width",
     displayName: "Espessura",
+    displayNameKey: "Slice_OutlineWidth",
     value: 1
   });
 
@@ -735,16 +757,19 @@ export class OutlineFormattingCard extends formattingSettings.SimpleCard {
 export class LegendFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "legend";
   public displayName: string = "Legenda";
+  public displayNameKey: string = "Card_Legend";
 
   public show = new formattingSettings.ToggleSwitch({
     name: "show",
     displayName: "Mostrar legenda",
+    displayNameKey: "Slice_LegendShow",
     value: false
   });
 
   public position = new formattingSettings.ItemDropdown({
     name: "position",
     displayName: "Posicao",
+    displayNameKey: "Slice_LegendPosition",
     items: [
       { value: "Top", displayName: "Superior" },
       { value: "Bottom", displayName: "Inferior" },
@@ -757,6 +782,7 @@ export class LegendFormattingCard extends formattingSettings.SimpleCard {
   public title = new formattingSettings.TextInput({
     name: "title",
     displayName: "Titulo",
+    displayNameKey: "Slice_LegendTitle",
     placeholder: "Legenda",
     value: ""
   });
@@ -764,12 +790,14 @@ export class LegendFormattingCard extends formattingSettings.SimpleCard {
   public labelColor = new formattingSettings.ColorPicker({
     name: "labelColor",
     displayName: "Cor do texto",
+    displayNameKey: "Slice_LegendLabelColor",
     value: { value: "#111111" }
   });
 
   public fontSize = new formattingSettings.NumUpDown({
     name: "fontSize",
     displayName: "Tamanho da fonte",
+    displayNameKey: "Slice_LegendFontSize",
     value: 12
   });
 
@@ -823,40 +851,47 @@ export class UiFormattingCard extends formattingSettings.SimpleCard {
 export class InteractionFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "interaction";
   public displayName: string = "Interação";
+  public displayNameKey: string = "Card_Interaction";
 
   public autoFocusSelectedArea = new formattingSettings.ToggleSwitch({
     name: "autoFocusSelectedArea",
     displayName: "Focar área selecionada",
+    displayNameKey: "Slice_InteractionAutoFocus",
     value: true
   });
 
   public focusExternalSelection = new formattingSettings.ToggleSwitch({
     name: "focusExternalSelection",
     displayName: "Focar seleção externa",
+    displayNameKey: "Slice_InteractionExternalFocus",
     value: false
   });
 
   public focusPadding = new formattingSettings.NumUpDown({
     name: "focusPadding",
     displayName: "Margem do foco",
+    displayNameKey: "Slice_InteractionPadding",
     value: 12
   });
 
   public focusAnimationMs = new formattingSettings.NumUpDown({
     name: "focusAnimationMs",
     displayName: "Duração da animação",
+    displayNameKey: "Slice_InteractionAnimation",
     value: 260
   });
 
   public unselectedOpacity = new formattingSettings.NumUpDown({
     name: "unselectedOpacity",
     displayName: "Opacidade não selecionadas",
+    displayNameKey: "Slice_InteractionUnselectedOpacity",
     value: 0.18
   });
 
   public labelUnselectedOpacity = new formattingSettings.NumUpDown({
     name: "labelUnselectedOpacity",
     displayName: "Opacidade dos rótulos não selecionados",
+    displayNameKey: "Slice_InteractionLabelUnselectedOpacity",
     value: 0.35
   });
 
@@ -873,10 +908,12 @@ export class InteractionFormattingCard extends formattingSettings.SimpleCard {
 export class LabelsFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "labels";
   public displayName: string = "Rótulos externos";
+  public displayNameKey: string = "Card_ExternalLabels";
 
   public labelMode = new formattingSettings.ItemDropdown({
     name: "labelMode",
     displayName: "Posição do rótulo",
+    displayNameKey: "Slice_LabelMode",
     items: [
       { value: "Inside", displayName: "Interno" },
       { value: "OutsideCallout", displayName: "Callout externo" }
@@ -887,6 +924,7 @@ export class LabelsFormattingCard extends formattingSettings.SimpleCard {
   public labelContent = new formattingSettings.ItemDropdown({
     name: "labelContent",
     displayName: "Conteúdo",
+    displayNameKey: "Slice_LabelContent",
     items: [
       { value: "Value", displayName: "Valor" },
       { value: "Category", displayName: "Categoria" },
@@ -909,24 +947,28 @@ export class LabelsFormattingCard extends formattingSettings.SimpleCard {
   public calloutDistance = new formattingSettings.NumUpDown({
     name: "calloutDistance",
     displayName: "Distância",
+    displayNameKey: "Slice_CalloutDistance",
     value: 36
   });
 
   public calloutLineColor = new formattingSettings.ColorPicker({
     name: "calloutLineColor",
     displayName: "Cor da linha",
+    displayNameKey: "Slice_CalloutLineColor",
     value: { value: "#333333" }
   });
 
   public calloutTextColor = new formattingSettings.ColorPicker({
     name: "calloutTextColor",
     displayName: "Cor do texto",
+    displayNameKey: "Slice_CalloutTextColor",
     value: { value: "#222222" }
   });
 
   public calloutLineWidth = new formattingSettings.NumUpDown({
     name: "calloutLineWidth",
     displayName: "Espessura da linha",
+    displayNameKey: "Slice_CalloutLineWidth",
     value: 1
   });
 
@@ -955,6 +997,7 @@ export class LabelsFormattingCard extends formattingSettings.SimpleCard {
   public calloutRouteStyle = new formattingSettings.ItemDropdown({
     name: "calloutRouteStyle",
     displayName: "Estilo do conector",
+    displayNameKey: "Slice_CalloutRouteStyle",
     items: [
       { value: "Curved", displayName: "Curva + reta" },
       { value: "Straight", displayName: "Reto" }
@@ -971,24 +1014,28 @@ export class LabelsFormattingCard extends formattingSettings.SimpleCard {
   public calloutAllowRight = new formattingSettings.ToggleSwitch({
     name: "calloutAllowRight",
     displayName: "Direita",
+    displayNameKey: "Slice_CalloutAllowRight",
     value: true
   });
 
   public calloutAllowLeft = new formattingSettings.ToggleSwitch({
     name: "calloutAllowLeft",
     displayName: "Esquerda",
+    displayNameKey: "Slice_CalloutAllowLeft",
     value: true
   });
 
   public calloutAllowTop = new formattingSettings.ToggleSwitch({
     name: "calloutAllowTop",
     displayName: "Cima",
+    displayNameKey: "Slice_CalloutAllowTop",
     value: false
   });
 
   public calloutAllowBottom = new formattingSettings.ToggleSwitch({
     name: "calloutAllowBottom",
     displayName: "Baixo",
+    displayNameKey: "Slice_CalloutAllowBottom",
     value: false
   });
 
@@ -1025,6 +1072,7 @@ export class MapRegistryFormattingCard extends formattingSettings.SimpleCard {
 export class EditorFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "editor";
   public displayName: string = "Editor de mapas";
+  public displayNameKey: string = "Card_Editor";
 
   public enabled = new formattingSettings.ToggleSwitch({
     name: "enabled",
@@ -1035,6 +1083,7 @@ export class EditorFormattingCard extends formattingSettings.SimpleCard {
   public showEditorButton = new formattingSettings.ToggleSwitch({
     name: "showEditorButton",
     displayName: "Mostrar botão do editor",
+    displayNameKey: "Slice_ShowEditorButton",
     value: true
   });
 
@@ -1050,10 +1099,12 @@ export class EditorFormattingCard extends formattingSettings.SimpleCard {
 export class DrillMapsFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "drillMaps";
   public displayName: string = "Drill Path";
+  public displayNameKey: string = "Card_DrillPath";
 
   public enabled = new formattingSettings.ToggleSwitch({
     name: "enabled",
     displayName: "Ativar Drill Path",
+    displayNameKey: "Slice_DrillEnabled",
     value: true
   });
 
@@ -1066,6 +1117,7 @@ export class DrillMapsFormattingCard extends formattingSettings.SimpleCard {
   public noDataBehavior = new formattingSettings.ItemDropdown({
     name: "noDataBehavior",
     displayName: "Áreas sem dados",
+    displayNameKey: "Slice_DrillNoDataBehavior",
     items: [
       { value: "Fade", displayName: "Desvanecer" },
       { value: "Hide", displayName: "Ocultar" }
@@ -1076,6 +1128,7 @@ export class DrillMapsFormattingCard extends formattingSettings.SimpleCard {
   public focusDataAreas = new formattingSettings.ToggleSwitch({
     name: "focusDataAreas",
     displayName: "Focar áreas com dados",
+    displayNameKey: "Slice_DrillFocusData",
     value: true
   });
 

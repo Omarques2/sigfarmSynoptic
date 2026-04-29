@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect x="0" y="0" width="800" height="500" fill="#f8fafc"/>
+  <g id="map-root" stroke="#243b53" stroke-width="3" stroke-linejoin="round">
+    <path id="Centro_Barretos_SP" title="Centro Barretos SP" fill="#dbeafe" d="M 74 45 L 341 45 Q 355 45 355 59 L 355 99 Q 355 113 341 113 L 74 113 Q 60 113 60 99 L 60 59 Q 60 45 74 45 Z" />
+    <path id="América_Barretos_SP" title="América Barretos SP" fill="#ede9fe" d="M 424 45 L 691 45 Q 705 45 705 59 L 705 99 Q 705 113 691 113 L 424 113 Q 410 113 410 99 L 410 59 Q 410 45 424 45 Z" />
+    <path id="Fortaleza_Barretos_SP" title="Fortaleza Barretos SP" fill="#ffedd5" d="M 92 131 L 359 131 Q 373 131 373 145 L 373 185 Q 373 199 359 199 L 92 199 Q 78 199 78 185 L 78 145 Q 78 131 92 131 Z" />
+    <path id="Ibirapuera_Barretos_SP" title="Ibirapuera Barretos SP" fill="#ccfbf1" d="M 442 131 L 709 131 Q 723 131 723 145 L 723 185 Q 723 199 709 199 L 442 199 Q 428 199 428 185 L 428 145 Q 428 131 442 131 Z" />
+    <path id="Marília_Barretos_SP" title="Marília Barretos SP" fill="#dcfce7" d="M 74 217 L 341 217 Q 355 217 355 231 L 355 271 Q 355 285 341 285 L 74 285 Q 60 285 60 271 L 60 231 Q 60 217 74 217 Z" />
+    <path id="Pereira_Barretos_SP" title="Pereira Barretos SP" fill="#fce7f3" d="M 424 217 L 691 217 Q 705 217 705 231 L 705 271 Q 705 285 691 285 L 424 285 Q 410 285 410 271 L 410 231 Q 410 217 424 217 Z" />
+    <path id="Primavera_Barretos_SP" title="Primavera Barretos SP" fill="#e0f2fe" d="M 92 303 L 359 303 Q 373 303 373 317 L 373 357 Q 373 371 359 371 L 92 371 Q 78 371 78 357 L 78 317 Q 78 303 92 303 Z" />
+    <path id="Santa_Cecília_Barretos_SP" title="Santa Cecília Barretos SP" fill="#fef9c3" d="M 442 303 L 709 303 Q 723 303 723 317 L 723 357 Q 723 371 709 371 L 442 371 Q 428 371 428 357 L 428 317 Q 428 303 442 303 Z" />
+    <path id="São_Judas_Barretos_SP" title="São Judas Barretos SP" fill="#f3e8ff" d="M 74 389 L 341 389 Q 355 389 355 403 L 355 443 Q 355 457 341 457 L 74 457 Q 60 457 60 443 L 60 403 Q 60 389 74 389 Z" />
+    <path id="Vida_Nova_Barretos_SP" title="Vida Nova Barretos SP" fill="#e2e8f0" d="M 424 389 L 691 389 Q 705 389 705 403 L 705 443 Q 705 457 691 457 L 424 457 Q 410 457 410 443 L 410 403 Q 410 389 424 389 Z" />
+  </g>
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" fill="#102033" text-anchor="middle">
+    <text x="207.5" y="85">Centro_Barretos_SP</text>
+    <text x="557.5" y="85">América_Barretos_SP</text>
+    <text x="225.5" y="171">Fortaleza_Barretos_SP</text>
+    <text x="575.5" y="171">Ibirapuera_Barretos_SP</text>
+    <text x="207.5" y="257">Marília_Barretos_SP</text>
+    <text x="557.5" y="257">Pereira_Barretos_SP</text>
+    <text x="225.5" y="343">Primavera_Barretos_SP</text>
+    <text x="575.5" y="343">Santa_Cecília_Barretos_SP</text>
+    <text x="207.5" y="429">São_Judas_Barretos_SP</text>
+    <text x="557.5" y="429">Vida_Nova_Barretos_SP</text>
+  </g>
+</svg>

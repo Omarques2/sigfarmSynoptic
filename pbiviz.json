@@ -1,12 +1,12 @@
 {
   "visual": {
-    "name": "geosynopticdev",
-    "displayName": "Sigfarm Geosynoptic Dev",
-    "guid": "SynopticPanelDev4F7C1A3E8D2B4F1C9A6E5B7D3C2A8F04",
+    "name": "geosynoptic",
+    "displayName": "SVG Synoptic Map",
+    "guid": "SynopticPanelE2B5B9B6B0B14B8C8B0E6C0A7D6A1F01",
     "visualClassName": "Visual",
-    "version": "1.0.0.11",
+    "version": "1.0.0.12",
     "description": "Painel sinotico em SVG com coloracao condicional, rotulos de valor, selecao, zoom/pan e tooltip.",
-    "supportUrl": "https://github.com/Omarques2/sigfarmSynoptic/blob/main/SUPPORT.md",
+    "supportUrl": "https://github.com/Omarques2/sigfarmSynoptic/blob/certification/SUPPORT.md",
     "gitHubUrl": "https://github.com/Omarques2/sigfarmSynoptic"
   },
   "apiVersion": "5.10.0",

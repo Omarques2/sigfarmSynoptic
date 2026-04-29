@@ -106,7 +106,7 @@ assert(/tabIndex\s*=\s*show \? 0 : -1/.test(visualTs), "botao Editor oculto nao 
 assert(/aria-hidden/.test(visualTs), "botao Editor deve atualizar aria-hidden.");
 assert(!/right:\s*"110px"/.test(visualTs), "botao Editor nao deve ficar no canto superior direito.");
 assert(!/opacity:\s*"0\.55"/.test(visualTs), "botao Editor nao deve ser translucido.");
-assert(/left:\s*"8px"/.test(visualTs) || /\.sp-editor-open[\s\S]*left:\s*8px/.test(visualLess), "botao Editor deve ficar no canto superior esquerdo.");
+assert(/\.sp-toolbar[\s\S]*left:\s*8px/.test(visualLess) || /\.sp-editor-open[\s\S]*left:\s*8px/.test(visualLess), "toolbar do editor deve ficar no canto superior esquerdo.");
 assert(/\.sp-editor-open/.test(visualLess), "botao Editor deve ter classe CSS dedicada.");
 assert(/dialogRegistry/.test(dialogTs), "MapEditorDialog.ts deve registrar o dialogo globalmente.");
 assert(/class\s+MapEditorDialog\b/.test(dialogTs), "MapEditorDialog.ts deve exportar a classe do dialogo.");

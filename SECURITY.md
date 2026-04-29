@@ -8,7 +8,7 @@ Security fixes are applied to the latest maintained code on the repository defau
 
 If you discover a security issue, please report it privately:
 - Email: contato@sigfarmintelligence.com
-- Subject: `Security report - Sigfarm Geosynoptic`
+- Subject: `Security report - SVG Synoptic Map`
 
 Please include:
 - A clear description of the issue

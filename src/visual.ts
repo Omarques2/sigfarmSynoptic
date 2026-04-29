@@ -16,6 +16,7 @@ import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import ISelectionId = powerbi.extensibility.ISelectionId;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
 import ILocalVisualStorageService = powerbi.extensibility.ILocalVisualStorageService;
+import ILocalizationManager = powerbi.extensibility.ILocalizationManager;
 
 import VisualObjectInstance = powerbi.VisualObjectInstance;
 import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInstancesOptions;
@@ -985,10 +986,10 @@ const ALLOWED_SVG_TAGS = new Set([
   "text",
   "tspan",
   "defs",
-  "clipPath",
+  "clippath",
   "mask",
-  "linearGradient",
-  "radialGradient",
+  "lineargradient",
+  "radialgradient",
   "stop",
   "image",
   "title",
@@ -1050,6 +1051,7 @@ const ALLOWED_SVG_ATTRS = new Set([
 ]);
 
 const URL_ATTRS = new Set(["fill", "stroke", "filter", "clip-path", "mask", "marker-start", "marker-mid", "marker-end"]);
+const SAFE_EMBEDDED_IMAGE_PREFIX = "data:image/png";
 
 function isUnsafeAttrValue(value: string): boolean {
   const v = value.trim();
@@ -1067,8 +1069,7 @@ function isSafeUrlRef(value: string): boolean {
 
 function isSafeImageHref(value: string): boolean {
   const v = value.trim().toLowerCase();
-  if (!v.startsWith("data:image/")) return false;
-  return !v.startsWith("data:image/svg");
+  return v.startsWith(SAFE_EMBEDDED_IMAGE_PREFIX);
 }
 
 function sanitizeStyleValue(value: string, report: SanitizationReport): string {
@@ -1530,6 +1531,7 @@ export class Visual implements IVisual {
   private host: any;
   private container: HTMLElement;
   private storageService: ILocalVisualStorageService | null = null;
+  private localizationManager?: ILocalizationManager;
 
   private svgRoot: SVGSVGElement | null = null;
   private zoomRoot: SVGGElement | null = null;
@@ -1600,6 +1602,7 @@ export class Visual implements IVisual {
   private svgWarningBody!: HTMLDivElement;
   private svgWarningCloseBtn!: HTMLButtonElement;
   private helpEl!: HTMLDivElement;
+  private helpButton!: HTMLButtonElement;
   private helpTitleEl!: HTMLDivElement;
   private helpListEl!: HTMLUListElement;
   private helpDotsEl!: HTMLDivElement;
@@ -1608,6 +1611,7 @@ export class Visual implements IVisual {
   private helpCloseBtn!: HTMLButtonElement;
   private helpPageIndex = 0;
   private helpDismissed = false;
+  private helpManualOpen = false;
   private helpSeenPersisted = false;
   private helpShownThisSession = false;
   private helpInitialized = false;
@@ -1627,6 +1631,7 @@ export class Visual implements IVisual {
   private drillLoadingHost!: HTMLDivElement;
   private legendHost!: HTMLDivElement;
   private editorHost!: HTMLDivElement;
+  private toolbarHost!: HTMLDivElement;
   private editorButton!: HTMLButtonElement;
   private editorOpen = false;
   private editorActiveTab: EditorTabKey = "Mapas";
@@ -1668,9 +1673,9 @@ export class Visual implements IVisual {
     this.storageService = (this.host as any)?.storageService ?? null;
 
     this.hostEnv = (this.host as any)?.hostEnv as number | undefined;
-    const localizationManager =
+    this.localizationManager =
       (this.host as any)?.createLocalizationManager ? (this.host as any).createLocalizationManager() : undefined;
-    this.formattingSettingsService = new FormattingSettingsService(localizationManager);
+    this.formattingSettingsService = new FormattingSettingsService(this.localizationManager);
     this.formattingSettingsModel = new VisualFormattingSettingsModel();
 
     this.selectionManager = (this.host as any)?.createSelectionManager
@@ -1687,7 +1692,9 @@ export class Visual implements IVisual {
     this.drillLoadingHost = this.createDrillLoadingHost();
     this.legendHost = this.createLegendUI();
     this.editorHost = this.createEditorHost();
+    this.toolbarHost = this.createToolbarHost();
     this.editorButton = this.createEditorButton();
+    this.helpButton = this.createHelpButton();
 
     this.createUploadUI();
     this.helpDismissed = false;
@@ -1703,6 +1710,15 @@ export class Visual implements IVisual {
     }
 
     this.wireContainerContextMenu();
+  }
+
+  private t(key: string, fallback: string): string {
+    try {
+      const localized = this.localizationManager?.getDisplayName?.(key);
+      return typeof localized === "string" && localized.trim() ? localized : fallback;
+    } catch {
+      return fallback;
+    }
   }
 
   // --- tooltip positioning: garante visibilidade (sem clipping e sem estourar tela) ---
@@ -1836,9 +1852,14 @@ export class Visual implements IVisual {
     }
     if (kind === "click") {
       const mouseEv = ev as MouseEvent;
-      if (mouseEv.button !== 0 || !row) return;
+      if (mouseEv.button !== 0) return;
       const multiSelect = mouseEv.ctrlKey || mouseEv.metaKey;
-      const drillRoute = this.getDrillRouteForRow(row);
+      const drillRoute = row ? this.getDrillRouteForRow(row) : null;
+      if (this.shouldFocusRegionWithoutSelection(drillRoute, multiSelect)) {
+        this.focusRegionWithoutSelection(el);
+        return;
+      }
+      if (!row) return;
       this.selectRow(row, multiSelect, undefined, drillRoute, {
         suppressHostSelect: this.shouldSuppressHostSelectionForUnmappedDrill(drillRoute, multiSelect)
       });
@@ -1846,16 +1867,21 @@ export class Visual implements IVisual {
     }
     if (kind === "keydown") {
       const keyEv = ev as KeyboardEvent;
-      if (!row) return;
       if (keyEv.key === "Enter" || keyEv.key === " ") {
         keyEv.preventDefault();
         const multiSelect = keyEv.ctrlKey || keyEv.metaKey;
-        const drillRoute = this.getDrillRouteForRow(row);
+        const drillRoute = row ? this.getDrillRouteForRow(row) : null;
+        if (this.shouldFocusRegionWithoutSelection(drillRoute, multiSelect)) {
+          this.focusRegionWithoutSelection(el);
+          return;
+        }
+        if (!row) return;
         this.selectRow(row, multiSelect, undefined, drillRoute, {
           suppressHostSelect: this.shouldSuppressHostSelectionForUnmappedDrill(drillRoute, multiSelect)
         });
         return;
       }
+      if (!row) return;
       if (keyEv.key === "ContextMenu" || (keyEv.shiftKey && keyEv.key === "F10")) {
         keyEv.preventDefault();
         const rect = el.getBoundingClientRect();
@@ -2285,6 +2311,38 @@ export class Visual implements IVisual {
     return !drillRoute;
   }
 
+  private shouldFocusRegionWithoutSelection(drillRoute: DrillClickRoute | null, multiSelect: boolean): boolean {
+    if (multiSelect) return false;
+    if (!this.settings.drillMaps.enabled) return false;
+    if (drillRoute) return false;
+    return this.getCurrentResolvedLevel() > 0;
+  }
+
+  private clearLocalSelectionWithoutFitReset(): void {
+    if (this.selectionSource !== "self" || this.selectedKeys.size === 0) return;
+    this.selectedKeys.clear();
+    this.selectionSource = "none";
+    this.applySelectionVisualState();
+
+    if (this.selectionManager?.select) {
+      this.selectionManager.select([] as ISelectionId[], false).catch(() => {
+        return;
+      });
+    }
+    this.selectionManager?.clear?.().catch(() => {
+      return;
+    });
+  }
+
+  private focusRegionWithoutSelection(el: SVGElement): void {
+    this.cancelPendingDrillFocus();
+    this.pendingDrillSource = null;
+    this.clearPotentialDrillClickState(true);
+    this.clearRegionHoverState();
+    this.clearLocalSelectionWithoutFitReset();
+    this.focusElements([el]);
+  }
+
   private selectRow(
     row: CatRow,
     multiSelect: boolean,
@@ -2602,11 +2660,18 @@ export class Visual implements IVisual {
     return host;
   }
 
+  private createToolbarHost(): HTMLDivElement {
+    const host = document.createElement("div");
+    host.className = "sp-toolbar";
+    this.container.appendChild(host);
+    return host;
+  }
+
   private createEditorButton(): HTMLButtonElement {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "sp-editor-open";
-    button.setAttribute("aria-label", "Abrir editor de mapa");
+    button.setAttribute("aria-label", this.t("Ui_Editor", "Editor"));
     button.setAttribute("aria-hidden", "true");
     button.tabIndex = -1;
 
@@ -2616,7 +2681,7 @@ export class Visual implements IVisual {
     icon.textContent = "</>";
 
     const label = document.createElement("span");
-    label.textContent = "Editor";
+    label.textContent = this.t("Ui_Editor", "Editor");
 
     button.append(icon, label);
     button.addEventListener("click", () => {
@@ -2629,7 +2694,40 @@ export class Visual implements IVisual {
       }
       this.setEditorOpen(!this.editorOpen);
     });
-    this.container.appendChild(button);
+    this.toolbarHost.appendChild(button);
+    return button;
+  }
+
+  private createHelpButton(): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "sp-editor-open sp-help-open";
+    button.setAttribute("aria-label", this.t("Ui_OpenTutorial", "Open visual guide"));
+    button.setAttribute("aria-hidden", "true");
+    button.tabIndex = -1;
+
+    const icon = document.createElement("span");
+    icon.className = "sp-editor-open-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "i";
+
+    const label = document.createElement("span");
+    label.textContent = this.t("Ui_Tutorial", "Guide");
+
+    button.append(icon, label);
+    button.addEventListener("click", () => {
+      const hasSvgConfigured = !!(this.activeMap?.svgText || "").trim();
+      if (!this.canShowHelpButton(this.lastUpdateOptions, hasSvgConfigured)) return;
+      this.helpManualOpen = !this.helpManualOpen;
+      if (this.helpManualOpen) {
+        this.helpDismissed = false;
+        this.helpShownThisSession = true;
+        this.setHelpPage(this.helpPageIndex);
+        this.helpEl.focus();
+      }
+      this.updateHelpVisibility(hasSvgConfigured, false);
+    });
+    this.toolbarHost.appendChild(button);
     return button;
   }
 
@@ -2641,6 +2739,10 @@ export class Visual implements IVisual {
 
   private canShowEditorButton(options?: VisualUpdateOptions, hasSvgConfigured = false): boolean {
     return this.canExposeEditorUi(options) && this.settings.editor.showEditorButton && hasSvgConfigured;
+  }
+
+  private canShowHelpButton(options?: VisualUpdateOptions, hasSvgConfigured = false): boolean {
+    return this.canExposeEditorUi(options) && hasSvgConfigured;
   }
 
   private canUseModalEditor(options?: VisualUpdateOptions): boolean {
@@ -3003,23 +3105,26 @@ export class Visual implements IVisual {
   private createHelpOverlay(): HTMLDivElement {
     const host = document.createElement("div");
     host.className = "sp-help";
-    host.setAttribute("role", "note");
-    host.setAttribute("aria-label", "Dicas de uso do visual");
+    host.setAttribute("role", "dialog");
+    host.setAttribute("aria-modal", "false");
+    host.setAttribute("aria-label", this.t("Ui_GuideTitle", "Visual guide"));
+    host.tabIndex = -1;
 
     const header = document.createElement("div");
     header.className = "sp-help-header";
 
     this.helpTitleEl = document.createElement("div");
     this.helpTitleEl.className = "sp-help-title";
-    this.helpTitleEl.textContent = "Dicas de uso";
+    this.helpTitleEl.textContent = this.t("Ui_GuideTitle", "Visual guide");
 
     this.helpCloseBtn = document.createElement("button");
     this.helpCloseBtn.type = "button";
     this.helpCloseBtn.className = "sp-help-close";
-    this.helpCloseBtn.setAttribute("aria-label", "Fechar dicas");
+    this.helpCloseBtn.setAttribute("aria-label", this.t("Ui_CloseTutorial", "Close guide"));
     this.helpCloseBtn.textContent = "×";
     this.helpCloseBtn.addEventListener("click", () => {
       this.helpDismissed = true;
+      this.helpManualOpen = false;
       this.helpSeenPersisted = true;
       this.writeStoredValue(UI_STORAGE_KEYS.helpSeen, "1");
       this.persistHelpShow(false);
@@ -3043,13 +3148,13 @@ export class Visual implements IVisual {
     this.helpPrevBtn = document.createElement("button");
     this.helpPrevBtn.type = "button";
     this.helpPrevBtn.className = "sp-help-nav-btn";
-    this.helpPrevBtn.textContent = "Anterior";
+    this.helpPrevBtn.textContent = this.t("Ui_Previous", "Previous");
     this.helpPrevBtn.addEventListener("click", () => this.setHelpPage(this.helpPageIndex - 1));
 
     this.helpNextBtn = document.createElement("button");
     this.helpNextBtn.type = "button";
     this.helpNextBtn.className = "sp-help-nav-btn";
-    this.helpNextBtn.textContent = "Proxima";
+    this.helpNextBtn.textContent = this.t("Ui_Next", "Next");
     this.helpNextBtn.addEventListener("click", () => this.setHelpPage(this.helpPageIndex + 1));
 
     this.helpDotsEl = document.createElement("div");
@@ -3062,120 +3167,76 @@ export class Visual implements IVisual {
     host.appendChild(header);
     host.appendChild(body);
     host.appendChild(nav);
+    host.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        this.helpManualOpen = false;
+        this.helpDismissed = true;
+        this.helpSeenPersisted = true;
+        this.writeStoredValue(UI_STORAGE_KEYS.helpSeen, "1");
+        host.style.display = "none";
+      }
+    });
     this.container.appendChild(host);
     this.setHelpPage(0);
     return host;
   }
 
   private getHelpPages(lang: UiLanguage): { title: string; bullets: string[] }[] {
-    if (lang === "en") {
-      return [
-        {
-          title: "Tip 1: Prepare the SVG",
-          bullets: [
-            "Make sure each area has a unique, stable ID.",
-            "Use IDs that match the category (e.g., curral_1, curral_2).",
-            "Avoid groups without IDs: only IDs map data.",
-            "If using images, prefer embedded PNG (data:image/png)."
-          ]
-        },
-        {
-          title: "Tip 2: Replace SVG button",
-          bullets: [
-            "Use the \"Trocar SVG\" button to select a .svg file.",
-            "It lives in the top-right corner of the visual.",
-            "It works only in Power BI Desktop."
-          ]
-        },
-        {
-          title: "Tip 3: SVG security",
-          bullets: [
-            "The visual cleans SVG markup before rendering.",
-            "Scripts, event handlers and unsafe external references are removed.",
-            "Prefer clean SVGs with unique and stable IDs."
-          ]
-        },
-        {
-          title: "Tip 4: Configure in Power BI",
-          bullets: [
-            "Paste the SVG in Format > SVG (text or data URI).",
-            "Adjust colors for matched/unmatched areas.",
-            "Enable/disable labels and set min/max sizes.",
-            "If the SVG doesn't show, check the viewBox."
-          ]
-        },
-        {
-          title: "Tip 5: Interactions",
-          bullets: [
-            "Click an area to filter.",
-            "Ctrl + click for multi-select.",
-            "Click outside areas to clear selection.",
-            "Right-click to open the context menu."
-          ]
-        },
-        {
-          title: "Tip 6: Navigation and zoom",
-          bullets: [
-            "Use the mouse wheel to zoom in/out.",
-            "Drag the background to pan when zoomed.",
-            "If zoom gets odd, zoom out until it resets.",
-            "Avoid SVGs with very different width/height scales."
-          ]
-        }
-      ];
-    }
-
+    void lang;
     return [
       {
-        title: "Dica 1: Preparar o SVG",
+        title: this.t("Help_1_Title", "Prepare SVG"),
         bullets: [
-          "Garanta que cada area tenha um ID unico e estavel.",
-          "Use IDs que casem com a categoria (ex.: curral_1, curral_2).",
-          "Evite grupos sem ID: somente IDs mapeiam dados.",
-          "Se usar imagens, prefira PNG embutido (data:image/png)."
+          this.t("Help_1_B1", "Each area needs a unique and stable ID."),
+          this.t("Help_1_B2", "Use IDs that match the category column."),
+          this.t("Help_1_B3", "Avoid duplicate IDs and decorative groups without need."),
+          this.t("Help_1_B4", "If you use images, prefer embedded PNG only.")
         ]
       },
       {
-        title: "Dica 2: Botao Trocar SVG",
+        title: this.t("Help_2_Title", "Map data correctly"),
         bullets: [
-          "Use o botao \"Trocar SVG\" para selecionar um arquivo .svg.",
-          "Ele fica no canto superior direito do visual.",
-          "Funciona apenas no Power BI Desktop."
+          this.t("Help_2_B1", "Region bucket is required and must match SVG IDs."),
+          this.t("Help_2_B2", "Legend is optional and also drives theme colors."),
+          this.t("Help_2_B3", "Value feeds gradient, labels, and tooltip metrics."),
+          this.t("Help_2_B4", "Tooltips can add extra context without affecting color.")
         ]
       },
       {
-        title: "Dica 3: Seguranca do SVG",
+        title: this.t("Help_3_Title", "Choose color mode"),
         bullets: [
-          "O visual limpa o SVG automaticamente antes de renderizar.",
-          "Scripts, eventos e referencias externas inseguras sao removidos.",
-          "Prefira SVGs limpos, com IDs unicos e estaveis."
+          this.t("Help_3_B1", "Theme follows Power BI palette."),
+          this.t("Help_3_B2", "Solid uses configured fill or conditional formatting."),
+          this.t("Help_3_B3", "Gradient uses low-mid-high palette from values."),
+          this.t("Help_3_B4", "Unmatched areas keep their own fallback color.")
         ]
       },
       {
-        title: "Dica 4: Configurar no Power BI",
+        title: this.t("Help_4_Title", "Use labels well"),
         bullets: [
-          "Cole o SVG em Formatar > SVG (texto ou data URI).",
-          "Ajuste as cores em Area para correspondencia e nao correspondencia.",
-          "Ative/desative rotulos e defina tamanhos minimo e maximo.",
-          "Se o SVG nao aparecer, confira o viewBox do arquivo."
+          this.t("Help_4_B1", "Internal labels fit better on larger areas."),
+          this.t("Help_4_B2", "External callouts help in dense maps."),
+          this.t("Help_4_B3", "Keep text concise in crowded SVGs."),
+          this.t("Help_4_B4", "Allowed-side toggles control callout direction.")
         ]
       },
       {
-        title: "Dica 5: Interacoes",
+        title: this.t("Help_5_Title", "Drill and editor"),
         bullets: [
-          "Clique em uma area para filtrar.",
-          "Ctrl + clique para multisselecao.",
-          "Clique fora das areas para limpar selecao.",
-          "Clique com o botao direito para menu de contexto."
+          this.t("Help_5_B1", "Drill only works when target maps are explicitly configured."),
+          this.t("Help_5_B2", "Areas without drill target should only select."),
+          this.t("Help_5_B3", "Editor is available only in supported authoring context."),
+          this.t("Help_5_B4", "Use editor to maintain registry, drill, and labels together.")
         ]
       },
       {
-        title: "Dica 6: Navegacao e zoom",
+        title: this.t("Help_6_Title", "Security and limits"),
         bullets: [
-          "Use o scroll do mouse para zoom in/out.",
-          "Arraste o fundo para mover (pan) quando estiver com zoom.",
-          "Se o zoom ficar estranho, use zoom out ate o ajuste automatico.",
-          "Evite SVGs com escala muito diferente entre width e height."
+          this.t("Help_6_B1", "Scripts and unsafe handlers are removed from SVG."),
+          this.t("Help_6_B2", "External resources are blocked."),
+          this.t("Help_6_B3", "Do not use data:image/svg+xml images inside SVG."),
+          this.t("Help_6_B4", "Keep sample and package fully offline.")
         ]
       }
     ];
@@ -3197,7 +3258,7 @@ export class Visual implements IVisual {
     }
 
     this.helpDotsEl.textContent = "";
-    const dotLabelPrefix = helpLang === "pt" ? "Ir para dica" : "Go to tip";
+    const dotLabelPrefix = this.t("Ui_GoToTip", helpLang === "pt" ? "Ir para dica" : "Go to tip");
     pages.forEach((_, i) => {
       const dot = document.createElement("span");
       dot.className = "sp-help-dot" + (i === clamped ? " is-active" : "");
@@ -3207,53 +3268,30 @@ export class Visual implements IVisual {
       this.helpDotsEl.appendChild(dot);
     });
 
-    this.helpPrevBtn.textContent = helpLang === "pt" ? "Anterior" : "Previous";
-    this.helpNextBtn.textContent = helpLang === "pt" ? "Proxima" : "Next";
+    this.helpPrevBtn.textContent = this.t("Ui_Previous", helpLang === "pt" ? "Anterior" : "Previous");
+    this.helpNextBtn.textContent = this.t("Ui_Next", helpLang === "pt" ? "Próxima" : "Next");
     this.helpPrevBtn.disabled = clamped === 0;
     this.helpNextBtn.disabled = clamped === pages.length - 1;
     if (this.helpCloseBtn) {
-      this.helpCloseBtn.setAttribute("aria-label", helpLang === "pt" ? "Fechar dicas" : "Close tips");
+      this.helpCloseBtn.setAttribute("aria-label", this.t("Ui_CloseTutorial", helpLang === "pt" ? "Fechar dicas" : "Close tips"));
     }
-
-    const highlightUpload = clamped === 1;
-    const highlightWarning = clamped === 2;
-    const helpVisible = !!this.helpEl && this.helpEl.style.display !== "none";
-    const effectiveUpload = highlightUpload && helpVisible;
-    const effectiveWarning = highlightWarning && helpVisible;
     if (this.helpEl) {
-      if (effectiveUpload) {
-        this.helpEl.style.left = "auto";
-        this.helpEl.style.right = "10px";
-        this.helpEl.style.top = "48px";
-        this.helpEl.style.maxWidth = "320px";
-        this.helpEl.style.bottom = "";
-      } else if (effectiveWarning) {
-        this.helpEl.style.left = "10px";
-        this.helpEl.style.right = "";
-        this.helpEl.style.top = "auto";
-        this.helpEl.style.bottom = "60px";
-        this.helpEl.style.maxWidth = "360px";
-      } else {
-        this.helpEl.style.left = "10px";
-        this.helpEl.style.right = "";
-        this.helpEl.style.top = "10px";
-        this.helpEl.style.maxWidth = "360px";
-        this.helpEl.style.bottom = "";
-      }
+      this.helpEl.style.left = "10px";
+      this.helpEl.style.right = "";
+      this.helpEl.style.top = "54px";
+      this.helpEl.style.maxWidth = "420px";
+      this.helpEl.style.bottom = "";
     }
-    this.setUploadButtonEmphasis(effectiveUpload);
+    this.setUploadButtonEmphasis(false);
     if (this.lastSanitizationReport && this.lastSanitizationSig) {
-      if (effectiveWarning) {
-        this.setSanitizationWarning(this.lastSanitizationReport, this.lastSanitizationSig, true);
-      } else {
-        this.setSanitizationWarning(this.lastSanitizationReport, this.lastSanitizationSig, false);
-      }
+      this.setSanitizationWarning(this.lastSanitizationReport, this.lastSanitizationSig, false);
     }
   }
 
   private updateHelpVisibility(hasSvg: boolean, forceShow: boolean = false) {
     if (!this.helpEl) return;
     if (!this.canShowSvgPickerUI()) {
+      this.helpManualOpen = false;
       this.helpEl.style.display = "none";
       return;
     }
@@ -3263,7 +3301,11 @@ export class Visual implements IVisual {
       this.helpShownThisSession = true;
     }
     const shouldShow =
-      show && hasSvg && !this.helpDismissed && (forceShow || !this.helpSeenPersisted || this.helpShownThisSession);
+      hasSvg &&
+      (
+        this.helpManualOpen ||
+        (show && !this.helpDismissed && (forceShow || !this.helpSeenPersisted || this.helpShownThisSession))
+      );
     if (shouldShow) {
       this.helpShownThisSession = true;
       if (!this.helpSeenPersisted) {
@@ -3496,13 +3538,22 @@ export class Visual implements IVisual {
   }
 
   private setEditorButtonVisibility(hasSvgConfigured: boolean, options?: VisualUpdateOptions) {
-    if (!this.editorButton) return;
+    if (!this.editorButton || !this.helpButton) return;
     const show = this.canShowEditorButton(options, hasSvgConfigured);
     this.editorButton.style.display = show ? "inline-flex" : "none";
     this.editorButton.setAttribute("aria-hidden", show ? "false" : "true");
     this.editorButton.tabIndex = show ? 0 : -1;
+    const showHelp = this.canShowHelpButton(options, hasSvgConfigured);
+    this.helpButton.style.display = showHelp ? "inline-flex" : "none";
+    this.helpButton.setAttribute("aria-hidden", showHelp ? "false" : "true");
+    this.helpButton.tabIndex = showHelp ? 0 : -1;
+    this.toolbarHost.style.display = show || showHelp ? "inline-flex" : "none";
     if (!show && this.editorOpen) {
       this.editorOpen = false;
+    }
+    if (!showHelp) {
+      this.helpManualOpen = false;
+      this.helpEl.style.display = "none";
     }
   }
 
@@ -3580,6 +3631,8 @@ export class Visual implements IVisual {
       this.svgHost.querySelectorAll("svg").forEach((el) => el.remove());
     }
     this.container.querySelectorAll(".sp-no-svg-msg").forEach((e) => e.remove());
+    this.helpManualOpen = false;
+    if (this.helpEl) this.helpEl.style.display = "none";
     this.setSanitizationWarning(null, null);
   }
 
@@ -4586,8 +4639,18 @@ export class Visual implements IVisual {
     this.lastDataDrillLevel = currentLevel;
     this.lastDataDrillPath = [...currentPath];
 
-    const map = (resolution.map as MapRegistryMap | null) || null;
-    const svgText = (map?.svgText || defaultSvgText || "").trim();
+    let map = (resolution.map as MapRegistryMap | null) || null;
+    let svgText = (map?.svgText || "").trim();
+    if (!svgText && resolution.reason === "none" && currentLevel > 0) {
+      const currentMapSvg = (this.activeMap?.map?.svgText || "").trim();
+      if (this.activeMap?.map && currentMapSvg) {
+        map = this.activeMap.map;
+        svgText = currentMapSvg;
+      }
+    }
+    if (!svgText) {
+      svgText = (defaultSvgText || "").trim();
+    }
     return {
       manifest,
       map,

@@ -1,3 +1,10 @@
 node_modules/
 .tmp/
 dist/
+tmp_pbiviz*/
+webpack.statistics*.html
+.pbi/
+.platform/
+cache.abf
+samples/_pbiviz_extract/
+synopticPanel.zip

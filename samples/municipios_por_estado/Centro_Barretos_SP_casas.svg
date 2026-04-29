@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect x="0" y="0" width="800" height="500" fill="#f8fafc"/>
+  <text x="400" y="42" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" fill="#102033" text-anchor="middle">Centro Barretos SP</text>
+  <g id="map-root" stroke="#243b53" stroke-width="3" stroke-linejoin="round">
+    <path id="Casa_001_Centro_Barretos_SP" title="Casa 001 Centro Barretos SP" fill="#bfdbfe" d="M 80 85 L 230 85 Q 240 85 240 95 L 240 180 Q 240 190 230 190 L 80 190 Q 70 190 70 180 L 70 95 Q 70 85 80 85 Z" />
+    <path id="Casa_002_Centro_Barretos_SP" title="Casa 002 Centro Barretos SP" fill="#c4b5fd" d="M 305 85 L 455 85 Q 465 85 465 95 L 465 180 Q 465 190 455 190 L 305 190 Q 295 190 295 180 L 295 95 Q 295 85 305 85 Z" />
+    <path id="Casa_003_Centro_Barretos_SP" title="Casa 003 Centro Barretos SP" fill="#fed7aa" d="M 530 85 L 680 85 Q 690 85 690 95 L 690 180 Q 690 190 680 190 L 530 190 Q 520 190 520 180 L 520 95 Q 520 85 530 85 Z" />
+    <path id="Casa_004_Centro_Barretos_SP" title="Casa 004 Centro Barretos SP" fill="#99f6e4" d="M 80 250 L 230 250 Q 240 250 240 260 L 240 345 Q 240 355 230 355 L 80 355 Q 70 355 70 345 L 70 260 Q 70 250 80 250 Z" />
+    <path id="Casa_005_Centro_Barretos_SP" title="Casa 005 Centro Barretos SP" fill="#bbf7d0" d="M 305 250 L 455 250 Q 465 250 465 260 L 465 345 Q 465 355 455 355 L 305 355 Q 295 355 295 345 L 295 260 Q 295 250 305 250 Z" />
+    <path id="Casa_006_Centro_Barretos_SP" title="Casa 006 Centro Barretos SP" fill="#fbcfe8" d="M 530 250 L 680 250 Q 690 250 690 260 L 690 345 Q 690 355 680 355 L 530 355 Q 520 355 520 345 L 520 260 Q 520 250 530 250 Z" />
+  </g>
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#102033" text-anchor="middle">
+    <text x="155" y="143">Casa_001_Centro_Barretos_SP</text>
+    <text x="380" y="143">Casa_002_Centro_Barretos_SP</text>
+    <text x="605" y="143">Casa_003_Centro_Barretos_SP</text>
+    <text x="155" y="308">Casa_004_Centro_Barretos_SP</text>
+    <text x="380" y="308">Casa_005_Centro_Barretos_SP</text>
+    <text x="605" y="308">Casa_006_Centro_Barretos_SP</text>
+  </g>
+</svg>

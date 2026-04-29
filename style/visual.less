@@ -8,6 +8,16 @@ p {
     }
 }
 
+.sp-toolbar {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 30;
+    display: none;
+    align-items: center;
+    gap: 8px;
+}
+
 .sp-help {
     position: absolute;
     top: 10px;
@@ -32,10 +42,10 @@ p {
 }
 
 .sp-editor-open {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    z-index: 30;
+    position: relative;
+    top: auto;
+    left: auto;
+    z-index: auto;
     display: none;
     align-items: center;
     gap: 6px;
@@ -57,6 +67,10 @@ p {
 .sp-editor-open:hover {
     background: #f8fafc;
     border-color: #b9c7d6;
+}
+
+.sp-help-open .sp-editor-open-icon {
+    font-size: 14px;
 }
 
 .sp-editor-open:focus-visible {

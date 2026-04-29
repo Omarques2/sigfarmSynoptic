@@ -14,3 +14,9 @@ Observacao: o visual usa o ID do elemento SVG para cruzar com "Curral".
 
 Caso de uso adicional:
 - O modo `Gradient` usa a medida atual para calcular a cor final de cada area sem alterar a sanitizacao do SVG.
+
+Para submissao:
+- sample PBIX final deve usar mesma versao do `.pbiviz` submetido;
+- sample deve funcionar offline;
+- sample deve incluir pagina final `Hints & Tips`;
+- pagina `Hints & Tips` pode ser baseada em `docs/sample-hints-and-tips.md`.
