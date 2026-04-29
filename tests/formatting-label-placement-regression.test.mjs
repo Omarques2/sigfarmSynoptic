@@ -21,6 +21,14 @@ assert(
     /this\.gradientHighFill\.visible\s*=\s*mode\s*===\s*"Gradient";/.test(settingsTs),
   "applyAreaFormattingVisibility deve mostrar as cores de gradiente apenas em Gradient."
 );
+assert(
+  /public\s+colorMode:\s+string\s*=\s*"Theme";/.test(settingsTs),
+  "AreaSettings deve usar Theme como modo padrão."
+);
+assert(
+  /Tema do Power BI/.test(settingsTs) && /value:\s*"Theme"/.test(settingsTs),
+  "Dropdown de cores deve expor Tema do Power BI."
+);
 
 const visualTs = fs.readFileSync("src/visual.ts", "utf8");
 

@@ -11,14 +11,14 @@ assert(areaProps.gradientHighFill, "capabilities.json deve expor area.gradientHi
 
 assert.deepEqual(
   areaProps.colorMode?.type?.enumeration?.map((entry) => entry?.value),
-  ["Solid", "Gradient"],
-  "area.colorMode deve expor apenas os modos Solid e Gradient."
+  ["Theme", "Solid", "Gradient"],
+  "area.colorMode deve expor Theme, Solid e Gradient."
 );
 
 const settingsTs = fs.readFileSync("src/settings.ts", "utf8");
 assert(
-  /public\s+colorMode:\s+string\s*=\s*"Solid";/.test(settingsTs),
-  "AreaSettings deve definir colorMode com default Solid."
+  /public\s+colorMode:\s+string\s*=\s*"Theme";/.test(settingsTs),
+  "AreaSettings deve definir colorMode com default Theme."
 );
 assert(
   /public\s+gradientLowFill:\s+string\s*=\s*"#FFF4B8";/.test(settingsTs),
@@ -72,6 +72,10 @@ assert(/colorMode/.test(visualTs), "visual.ts deve considerar colorMode.");
 assert(
   /this\.settings\.area\.colorMode\s*===\s*"Gradient"/.test(visualTs),
   "visual.ts deve ter branch explicito para o modo Gradient."
+);
+assert(
+  /this\.settings\.area\.colorMode\s*===\s*"Theme"/.test(visualTs),
+  "visual.ts deve ter branch explicito para o modo Theme."
 );
 assert(
   /Number\.isFinite\(/.test(visualTs),

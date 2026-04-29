@@ -46,7 +46,12 @@ function getFill(root: unknown, objectName: string, prop: string, def: string): 
 }
 
 function normalizeAreaColorMode(mode: string | undefined | null): string {
-  return mode === "Gradient" ? "Gradient" : "Solid";
+  if (mode === "Gradient") return "Gradient";
+  if (mode === "Solid") return "Solid";
+  if (mode === "Theme" || mode === "ThemeOrMatched" || mode === "ThemePalette" || mode === "PowerBITheme") {
+    return "Theme";
+  }
+  return "Theme";
 }
 
 function normalizeLabelMode(mode: string | undefined | null): string {
@@ -97,7 +102,7 @@ function normalizeLabelDenseMode(mode: string | undefined | null): string {
 }
 
 export class AreaSettings {
-  public colorMode: string = "Solid";
+  public colorMode: string = "Theme";
   public unmatchedFill: string = "#D3D3D3";
   public matchedFill: string = "#4CAF50";
   public gradientLowFill: string = "#FFF4B8";
@@ -465,10 +470,11 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
     name: "colorMode",
     displayName: "Modo de cor",
     items: [
+      { value: "Theme", displayName: "Tema do Power BI" },
       { value: "Solid", displayName: "Cor simples" },
       { value: "Gradient", displayName: "Gradiente" }
     ],
-    value: { value: "Solid", displayName: "Cor simples" }
+    value: { value: "Theme", displayName: "Tema do Power BI" }
   });
 
   public unmatchedFill = new formattingSettings.ColorPicker({
@@ -527,7 +533,9 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
     this.colorMode.value =
       mode === "Gradient"
         ? { value: "Gradient", displayName: "Gradiente" }
-        : { value: "Solid", displayName: "Cor simples" };
+        : mode === "Solid"
+          ? { value: "Solid", displayName: "Cor simples" }
+          : { value: "Theme", displayName: "Tema do Power BI" };
   }
 }
 
@@ -628,7 +636,6 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
   public slices = [
     this.svgText,
     this.defaultFill,
-    this.alwaysShowWarning,
     this.labelShow,
     this.labelMin,
     this.labelMax,
@@ -1149,7 +1156,6 @@ export class VisualFormattingSettingsModel extends formattingSettings.Model {
     this.labelOverrides,
     this.performance,
     this.help,
-    this.warning,
     this.ui
   ];
 }

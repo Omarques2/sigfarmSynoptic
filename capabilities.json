@@ -34,6 +34,7 @@
           "displayName": "Modo de cor",
           "type": {
             "enumeration": [
+              { "displayName": "Tema do Power BI", "value": "Theme" },
               { "displayName": "Cor simples", "value": "Solid" },
               { "displayName": "Gradiente", "value": "Gradient" }
             ]
@@ -305,7 +306,10 @@
   "sorting": { "default": {} },
   "supportsKeyboardFocus": true,
   "supportsHighlight": true,
-  "drilldown": { "roles": ["category"] },
+  "drilldown": {
+    "roles": ["category"],
+    "canDisableDrill": {}
+  },
   "suppressDefaultTitle": false,
   "advancedEditModeSupport": 2,
   "privileges": [

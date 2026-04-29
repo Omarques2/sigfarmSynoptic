@@ -31,6 +31,45 @@ p {
     pointer-events: auto;
 }
 
+.sp-editor-open {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 30;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 7px 10px;
+    border: 1px solid #d6e1ec;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #102033;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+    cursor: pointer;
+    font-family: "Segoe UI", -apple-system, Roboto, Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 1;
+    user-select: none;
+}
+
+.sp-editor-open:hover {
+    background: #f8fafc;
+    border-color: #b9c7d6;
+}
+
+.sp-editor-open:focus-visible {
+    outline: 2px solid #118d7f;
+    outline-offset: 2px;
+}
+
+.sp-editor-open-icon {
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+}
+
 .sp-help-header {
     display: flex;
     align-items: center;
@@ -279,10 +318,22 @@ p {
     overflow: hidden;
 }
 
+.sp-editor-browser-sidebar,
+.sp-editor-browser-detail,
+.sp-editor-detail-preview,
+.sp-editor-detail-sidebar,
+.sp-editor-inspector,
+.sp-editor-area-list,
+.sp-editor-area-list-inner,
+.sp-editor-area-list-content {
+    box-sizing: border-box;
+}
+
 .sp-editor-browser-sidebar {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    overflow: visible;
 }
 
 .sp-editor-browser-header,
@@ -318,7 +369,7 @@ p {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: visible;
 }
 
 .sp-editor-area-list {
@@ -328,6 +379,7 @@ p {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    padding-bottom: 4px;
 }
 
 .sp-editor-area-list-inner {
@@ -343,6 +395,7 @@ p {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    padding-bottom: 8px;
 }
 
 .sp-editor-map-item,
@@ -357,6 +410,81 @@ p {
     cursor: pointer;
     min-height: 64px;
     box-sizing: border-box;
+}
+
+.sp-editor-map-item-shell {
+    position: relative;
+    display: block;
+    z-index: 0;
+}
+
+.sp-editor-map-item-shell.is-menu-open {
+    z-index: 60;
+}
+
+.sp-editor-map-item-shell > .sp-editor-map-item {
+    min-width: 0;
+    padding-right: 64px;
+}
+
+.sp-editor-map-actions {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    z-index: 4;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+}
+
+.sp-editor-map-action-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 30;
+    min-width: 150px;
+    padding: 6px;
+    border: 1px solid #d8e1eb;
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+}
+
+.sp-editor-map-action-menu.is-open-up {
+    top: auto;
+    bottom: calc(100% + 8px);
+}
+
+.sp-editor-map-action-menu-item {
+    width: 100%;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    padding: 8px 10px;
+    text-align: left;
+    color: #172033;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.sp-editor-map-action-menu-item:hover,
+.sp-editor-map-action-menu-item:focus {
+    background: #f1f5f9;
+}
+
+.sp-editor-map-action-menu-item.is-danger {
+    color: #b42318;
+}
+
+.sp-editor-map-action-menu-item.is-danger:hover,
+.sp-editor-map-action-menu-item.is-danger:focus {
+    background: #fff1f0;
+}
+
+.sp-editor-map-rename-input {
+    padding: 6px 8px;
+    font-weight: 600;
+    font-size: 12px;
 }
 
 .sp-editor-area-item {
@@ -416,6 +544,53 @@ p {
     margin-top: auto;
 }
 
+.sp-editor-add-map-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.sp-editor-add-map-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    z-index: 40;
+    min-width: 190px;
+    padding: 6px;
+    border: 1px solid #d8e1eb;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.16);
+}
+
+.sp-editor-add-map-menu.is-open-up {
+    top: auto;
+    bottom: calc(100% + 8px);
+}
+
+.sp-editor-add-map-menu-item {
+    width: 100%;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    padding: 9px 10px;
+    text-align: left;
+    color: #172033;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.sp-editor-add-map-menu-item:hover,
+.sp-editor-add-map-menu-item:focus {
+    background: #f1f5f9;
+}
+
+.sp-editor-add-map-menu-item:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
 .sp-editor-browser-main {
     min-height: 0;
     overflow: hidden;
@@ -440,6 +615,8 @@ p {
     border-radius: 14px;
     overflow: hidden;
     background: #f8fafc;
+    display: flex;
+    flex-direction: column;
 }
 
 .sp-editor-preview.is-compact {
@@ -462,8 +639,9 @@ p {
 .sp-editor-preview svg {
     width: 100%;
     height: 100%;
-    max-width: 100%;
-    max-height: 100%;
+    max-width: none;
+    max-height: none;
+    display: block;
 }
 
 .sp-editor-detail-preview > .sp-editor-preview {
@@ -544,7 +722,6 @@ p {
     grid-template-columns: minmax(0, 1.8fr) minmax(360px, 460px);
     gap: 12px;
     flex: 1 1 auto;
-    height: 100%;
     min-height: 0;
     overflow: hidden;
 }
@@ -559,11 +736,11 @@ p {
 
 .sp-editor-detail-sidebar {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) minmax(150px, auto);
     gap: 8px;
-    height: 100%;
     min-height: 0;
     overflow: hidden;
+    padding-bottom: 18px;
 }
 
 .sp-editor-detail-search {
@@ -584,10 +761,12 @@ p {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    min-height: 0;
+    min-height: 150px;
+    max-height: 260px;
     overflow: hidden;
     box-sizing: border-box;
     align-self: stretch;
+    margin-bottom: 2px;
 }
 
 .sp-editor-inspector-title {
@@ -760,8 +939,1141 @@ p {
     max-height: min(520px, 100%);
 }
 
+.sp-editor-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #dbe3eb;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.sp-editor-card h4 {
+    margin: 0;
+    color: #10203a;
+    font-size: 14px;
+}
+
+.sp-editor-drill-tree {
+    margin: 0;
+    padding-left: 22px;
+    color: #53657c;
+    font-size: 12px;
+}
+
+.sp-editor-drill-tree .is-active {
+    color: #0f766e;
+    font-weight: 700;
+}
+
+.sp-editor-drill-map-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.8fr) 88px minmax(220px, 1fr) auto auto auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.sp-editor-drill-branch-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(180px, 0.8fr);
+    gap: 8px;
+    align-items: center;
+    color: #10203a;
+    font-size: 12px;
+}
+
+.sp-editor-drill-page {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: 16px;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    padding: 18px;
+    box-sizing: border-box;
+}
+
+.sp-editor-drill-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.sp-editor-drill-page-header h3 {
+    margin: 0;
+    color: #10203a;
+    font-size: 24px;
+}
+
+.sp-editor-drill-screen-tabs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.sp-editor-drill-screen-tabs .is-active {
+    border-color: #0f9488;
+    background: #e8f8f5;
+    color: #08756d;
+}
+
+.sp-editor-drill-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(130px, 0.6fr) auto;
+    align-items: stretch;
+    border: 1px solid #d8e3f2;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    overflow: hidden;
+}
+
+.sp-editor-drill-summary-tile {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 10px;
+    padding: 10px 14px;
+    border-right: 1px solid #e4ebf5;
+}
+
+.sp-editor-drill-summary-tile strong {
+    display: block;
+    color: #08756d;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sp-editor-drill-summary-label {
+    display: block;
+    margin-bottom: 3px;
+    color: #5b6b83;
+    font-size: 11px;
+}
+
+.sp-editor-drill-summary-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #e8f8f5;
+    color: #08756d;
+}
+
+.sp-editor-drill-chip-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+}
+
+.sp-editor-drill-chip {
+    padding: 6px 10px;
+    border: 1px solid #cbd8ea;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.sp-editor-drill-chip.is-manual {
+    border-color: #9edbd2;
+    background: #f2fbf9;
+    color: #08756d;
+}
+
+.sp-editor-drill-chip.is-automatic {
+    border-color: #b9ccff;
+    background: #f4f7ff;
+    color: #3769d6;
+}
+
+.sp-editor-drill-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 20px;
+    min-height: 0;
+}
+
+.sp-editor-drill-screen {
+    min-height: 0;
+    height: 100%;
+}
+
+.sp-editor-drill-preview-screen {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+}
+
+.sp-editor-drill-config-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 31%, 340px);
+    gap: 20px;
+    min-height: 0;
+}
+
+.sp-editor-drill-preview-card,
+.sp-editor-drill-legend,
+.sp-editor-drill-config-card,
+.sp-editor-drill-details {
+    border: 1px solid #d8e3f2;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+    min-width: 0;
+    min-height: 0;
+}
+
+.sp-editor-drill-preview-card {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    overflow: hidden;
+}
+
+.sp-editor-drill-preview-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px 8px;
+}
+
+.sp-editor-drill-preview-head h4,
+.sp-editor-drill-legend h4 {
+    margin: 0;
+    color: #10203a;
+    font-size: 15px;
+}
+
+.sp-editor-drill-preview-head p {
+    margin: 4px 0 0;
+    color: #5b6b83;
+    font-size: 12px;
+}
+
+.sp-editor-drill-preview-tools {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.sp-editor-drill-flow-viewport {
+    position: relative;
+    min-height: 0;
+    overflow: auto;
+    border-top: 1px solid #e4ebf5;
+    background:
+        radial-gradient(circle at 20px 20px, rgba(15, 148, 136, 0.03), transparent 26px),
+        linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+}
+
+.sp-editor-drill-level-header {
+    position: relative;
+    z-index: 5;
+    height: 34px;
+    overflow: hidden;
+    border-top: 1px solid #e4ebf5;
+    border-bottom: 1px solid #e4ebf5;
+    background: rgba(255, 255, 255, 0.96);
+    pointer-events: none;
+}
+
+.sp-editor-drill-level-header-inner {
+    position: relative;
+    height: 34px;
+    min-width: 100%;
+    transform-origin: 0 0;
+    will-change: transform;
+}
+
+.sp-editor-drill-graph-scale-host {
+    position: relative;
+    min-width: 100%;
+    min-height: 100%;
+}
+
+.sp-editor-drill-graph-canvas {
+    position: relative;
+    min-width: 100%;
+    min-height: 100%;
+    transform-origin: 0 0;
+}
+
+.sp-editor-drill-graph-edges {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+    z-index: 1;
+}
+
+.sp-editor-drill-edge,
+.sp-editor-drill-edge-fork {
+    fill: none;
+    stroke-width: 2.35;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.sp-editor-drill-edge.is-manual,
+.sp-editor-drill-edge-fork {
+    stroke: var(--drill-branch-color, #3b82f6);
+    stroke-dasharray: none;
+    opacity: 1;
+}
+
+.sp-editor-drill-edge.is-automatic {
+    stroke: #3b82f6;
+    stroke-dasharray: 4 5;
+    opacity: 0.78;
+}
+
+.sp-editor-drill-edge.is-none {
+    stroke: #94a3b8;
+    stroke-dasharray: 3 6;
+    opacity: 0.75;
+}
+
+.sp-editor-drill-edge.is-error {
+    stroke: #dc2626;
+    stroke-width: 2.7;
+    stroke-dasharray: none;
+}
+
+.sp-editor-drill-edge-trunk {
+    fill: none;
+    stroke-width: 2.35;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke: rgba(91, 107, 131, 0.45);
+    vector-effect: non-scaling-stroke;
+}
+
+.sp-editor-drill-edge-spine {
+    display: none;
+    fill: none;
+    stroke: #94a3b8;
+    stroke-width: 1.5;
+    stroke-dasharray: none;
+    opacity: 0;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.sp-editor-drill-graph-node {
+    position: absolute;
+    min-height: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    cursor: default;
+    transform: translateY(-50%);
+    z-index: 2;
+}
+
+.sp-editor-drill-branch-node {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 230px);
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    width: auto;
+}
+
+.sp-editor-drill-graph-node.is-clickable {
+    cursor: pointer;
+}
+
+.sp-editor-drill-graph-node.is-clickable:hover {
+    background: transparent;
+}
+
+.sp-editor-drill-graph-node.is-root {
+    background: transparent;
+}
+
+.sp-editor-drill-graph-node.is-automatic {
+    background: transparent;
+}
+
+.sp-editor-drill-graph-node.is-none {
+    background: transparent;
+}
+
+.sp-editor-drill-graph-node.is-error {
+    background: transparent;
+}
+
+.sp-editor-drill-branch-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 3px solid #ffffff;
+    outline: 2px solid var(--drill-branch-color, #3b82f6);
+    background: var(--drill-branch-color, #3b82f6);
+    box-shadow: 0 0 0 4px var(--drill-branch-halo, rgba(59, 130, 246, 0.14));
+}
+
+.sp-editor-drill-branch-node.is-root .sp-editor-drill-branch-dot {
+    width: 30px;
+    height: 30px;
+    outline-color: #0f9488;
+    background: #0f9488;
+    box-shadow: 0 0 0 5px rgba(15, 148, 136, 0.16);
+}
+
+.sp-editor-drill-branch-node.is-automatic .sp-editor-drill-branch-dot {
+    background: #ffffff;
+    outline-style: dashed;
+    outline-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+}
+
+.sp-editor-drill-branch-node.is-none .sp-editor-drill-branch-dot {
+    background: #ffffff;
+    outline-style: dashed;
+    outline-color: #94a3b8;
+    box-shadow: none;
+}
+
+.sp-editor-drill-branch-node.is-error .sp-editor-drill-branch-dot {
+    background: #dc2626;
+    outline-color: #dc2626;
+    box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.12);
+}
+
+.sp-editor-drill-branch-label {
+    position: relative;
+    z-index: 3;
+    min-width: 0;
+    width: max-content;
+    max-width: 230px;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    pointer-events: none;
+    justify-self: start;
+}
+
+.sp-editor-drill-branch-label strong {
+    display: block;
+    overflow: hidden;
+    width: max-content;
+    max-width: 230px;
+    padding-right: 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #17233a;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sp-editor-drill-branch-label span {
+    display: block;
+    overflow: hidden;
+    width: max-content;
+    max-width: 230px;
+    padding-right: 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.92);
+    margin-top: 3px;
+    color: #5b6b83;
+    font-size: 12px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sp-editor-drill-branch-label .sp-editor-drill-branch-map-link {
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.sp-editor-drill-branch-label .sp-editor-drill-branch-map-link:hover {
+    color: #0f766e;
+    text-decoration: underline;
+}
+
+.sp-editor-drill-branch-node.is-clickable:hover .sp-editor-drill-branch-label strong {
+    color: #0f766e;
+    text-decoration: underline;
+}
+
+.sp-editor-drill-branch-node.is-clickable:hover .sp-editor-drill-branch-dot {
+    box-shadow: 0 0 0 6px rgba(15, 148, 136, 0.18);
+}
+
+.sp-editor-drill-branch-node.is-clickable:hover .sp-editor-drill-branch-label {
+    background: transparent;
+}
+
+.sp-editor-drill-node-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 6px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #e8f8f5;
+    color: #08756d;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.sp-editor-drill-node-error {
+    margin-top: 6px;
+    color: #b91c1c;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.sp-editor-drill-edge-label {
+    position: absolute;
+    z-index: 2;
+    max-width: 160px;
+    overflow: hidden;
+    border: 1px solid #d8e3f2;
+    border-radius: 999px;
+    background: #ffffff;
+    padding: 3px 8px;
+    color: #17233a;
+    font-size: 12px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    transform: translate(-50%, -50%);
+}
+
+.sp-editor-drill-level-markers {
+    position: relative;
+    height: 34px;
+    min-width: 100%;
+    pointer-events: none;
+}
+
+.sp-editor-drill-level-marker {
+    position: absolute;
+    top: 10px;
+    color: #5b6b83;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transform: none;
+    white-space: nowrap;
+}
+
+.sp-editor-drill-flow-row {
+    display: grid;
+    grid-template-columns: 150px minmax(120px, 1fr) 210px;
+    column-gap: 12px;
+    row-gap: 6px;
+    align-items: center;
+    min-height: 50px;
+    margin: 4px 0;
+}
+
+.sp-editor-drill-source {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #17233a;
+    font-weight: 800;
+}
+
+.sp-editor-drill-dot {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background: #0f9488;
+    box-shadow: 0 0 0 2px #0f9488;
+}
+
+.sp-editor-drill-dot.is-root {
+    width: 22px;
+    height: 22px;
+}
+
+.sp-editor-drill-connection {
+    position: relative;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-top: 2px solid #0f9488;
+    background: transparent;
+    cursor: pointer;
+}
+
+.sp-editor-drill-connection::after {
+    content: "";
+    position: absolute;
+    top: -7px;
+    right: -9px;
+    width: 10px;
+    height: 10px;
+    border: 3px solid #3b79ff;
+    border-radius: 50%;
+    background: #ffffff;
+}
+
+.sp-editor-drill-node {
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+
+.sp-editor-drill-node:hover,
+.sp-editor-drill-connection:hover {
+    background: #f3f7fb;
+}
+
+.sp-editor-drill-node em {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 1px 5px;
+    border: 1px solid #9edbd2;
+    border-radius: 6px;
+    background: #f2fbf9;
+    color: #08756d;
+    font-size: 11px;
+    font-style: normal;
+}
+
+.sp-editor-drill-flow-row.is-automatic .sp-editor-drill-dot {
+    background: #ffffff;
+}
+
+.sp-editor-drill-flow-row.is-automatic .sp-editor-drill-connection {
+    border-color: #8aa3c5;
+    border-top-style: dashed;
+}
+
+.sp-editor-drill-flow-row.is-none .sp-editor-drill-dot {
+    background: #ffffff;
+    box-shadow: 0 0 0 2px #b7c1cf;
+}
+
+.sp-editor-drill-flow-row.is-none .sp-editor-drill-connection {
+    border-color: #c7d0dc;
+    border-top-style: dotted;
+}
+
+.sp-editor-drill-flow-row.is-none .sp-editor-drill-node strong {
+    color: #7a8798;
+}
+.sp-editor-drill-inline-editor {
+    display: none;
+    grid-column: 2 / 4;
+    padding: 8px 10px;
+    border: 1px solid #d8e3f2;
+    border-radius: 10px;
+    background: #f8fbff;
+}
+
+.sp-editor-drill-flow-row.is-editing .sp-editor-drill-inline-editor {
+    display: block;
+}
+
+.sp-editor-drill-inline-editor label {
+    display: grid;
+    grid-template-columns: 96px minmax(150px, 1fr);
+    gap: 8px;
+    align-items: center;
+    color: #5b6b83;
+    font-weight: 700;
+}
+
+.sp-editor-drill-target-select {
+    min-height: 34px;
+    font-size: 12px;
+}
+
+.sp-editor-drill-more {
+    margin: 10px 0 0 150px;
+}
+
+.sp-editor-drill-empty {
+    padding: 18px;
+    color: #5b6b83;
+}
+
+.sp-editor-drill-preview-legend-bar {
+    display: none;
+}
+
+.sp-editor-drill-preview-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #52627a;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.sp-editor-drill-level-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 7px;
+    background: #0f9488;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.sp-editor-drill-level-badge.is-level-2 {
+    background: #477cff;
+}
+
+.sp-editor-drill-level-badge.is-level-3 {
+    background: #8b5cf6;
+}
+
+.sp-editor-drill-level-badge.is-level-4 {
+    background: #d6dee9;
+    color: #536176;
+}
+
+.sp-editor-drill-config {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 31%, 340px);
+    gap: 20px;
+    align-items: stretch;
+    min-height: 0;
+}
+
+.sp-editor-drill-config-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 14px;
+}
+
+.sp-editor-drill-config-card h4,
+.sp-editor-drill-details h4 {
+    margin: 0;
+    color: #10203a;
+    font-size: 16px;
+}
+
+.sp-editor-drill-config-card > p {
+    margin: 4px 0 10px;
+    color: #5b6b83;
+    font-size: 12px;
+}
+
+.sp-editor-drill-config-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.sp-editor-drill-config-toolbar.is-search-only {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr);
+    gap: 10px;
+}
+
+.sp-editor-drill-config-search {
+    width: 100%;
+    height: 34px;
+    border: 1px solid #cbd8ea;
+    border-radius: 8px;
+    padding: 0 10px;
+    color: #10203a;
+    font-size: 12px;
+}
+
+.sp-editor-drill-filter {
+    height: 32px;
+    border: 1px solid #d8e3f2;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #5b6b83;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 0 9px;
+    cursor: pointer;
+}
+
+.sp-editor-drill-filter.is-active {
+    border-color: #0f9488;
+    background: #e8f8f5;
+    color: #08756d;
+}
+
+.sp-editor-drill-config-batch {
+    margin-left: auto;
+}
+
+.sp-editor-drill-config-table {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    border: 1px solid #e4ebf5;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.sp-editor-drill-config-header,
+.sp-editor-drill-config-row {
+    display: grid;
+    grid-template-columns: 44px 120px minmax(240px, 1fr) 140px 40px;
+    gap: 12px;
+    align-items: center;
+    padding: 0 14px;
+}
+
+.sp-editor-drill-config-header {
+    min-height: 34px;
+    background: #f8fbff;
+    color: #5b6b83;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.sp-editor-drill-config-body {
+    max-height: none;
+    overflow-y: auto;
+}
+
+.sp-editor-drill-config-row {
+    min-height: 58px;
+    border-top: 1px solid #e4ebf5;
+    color: #17233a;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.sp-editor-drill-config-row.is-search-hidden {
+    display: none !important;
+}
+
+.sp-editor-drill-config-row.is-selected {
+    background: #e8f8f5;
+}
+
+.sp-editor-drill-config-table.is-empty-search {
+    opacity: 0.72;
+}
+
+.sp-editor-drill-config-area {
+    font-weight: 800;
+}
+
+.sp-editor-drill-config-select {
+    width: 100%;
+    min-height: 32px;
+    font-size: 12px;
+}
+
+.sp-editor-drill-row-menu {
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #5b6b83;
+    cursor: pointer;
+}
+
+.sp-editor-drill-row-menu:hover {
+    background: #f3f7fb;
+}
+
+.sp-editor-drill-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 0 7px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.sp-editor-drill-status-badge.is-manual {
+    border-color: #9edbd2;
+    background: #e8f8f5;
+    color: #08756d;
+}
+
+.sp-editor-drill-status-badge.is-automatic {
+    border-color: #b9ccff;
+    background: #f4f7ff;
+    color: #3769d6;
+}
+
+.sp-editor-drill-status-badge.is-none {
+    border-color: #d8e3f2;
+    background: #f3f7fb;
+    color: #5b6b83;
+}
+
+.sp-editor-drill-config-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    color: #5b6b83;
+    font-size: 12px;
+}
+
+.sp-editor-drill-config-empty {
+    padding: 18px;
+    color: #5b6b83;
+    font-size: 12px;
+    text-align: center;
+}
+
+.sp-editor-drill-details {
+    padding: 14px;
+    overflow: auto;
+}
+
+.sp-editor-drill-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 10px 0 12px;
+}
+
+.sp-editor-drill-area-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #0f9488;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.sp-editor-drill-detail-title {
+    margin: 0;
+    color: #10203a;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.sp-editor-drill-detail-subtitle {
+    display: block;
+    margin-top: 2px;
+    color: #6b7a90;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.sp-editor-drill-detail-field {
+    margin-bottom: 10px;
+}
+
+.sp-editor-drill-detail-field span {
+    display: block;
+    margin-bottom: 4px;
+    color: #5b6b83;
+    font-size: 11px;
+}
+
+.sp-editor-drill-detail-field strong {
+    display: block;
+    overflow: hidden;
+    color: #10203a;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sp-editor-drill-details h5 {
+    margin: 10px 0 7px;
+    color: #10203a;
+    font-size: 12px;
+}
+
+.sp-editor-drill-details-separator {
+    margin: 12px 0;
+    border: 0;
+    border-top: 1px solid #e4ebf5;
+}
+
+.sp-editor-drill-geometry-preview {
+    height: 180px;
+    overflow: hidden;
+    border: 1px solid #d8e3f2;
+    border-radius: 12px;
+    background-color: #ffffff;
+    background-image:
+        linear-gradient(#e4ebf5 1px, transparent 1px),
+        linear-gradient(90deg, #e4ebf5 1px, transparent 1px);
+    background-size: 18px 18px;
+    padding: 8px;
+}
+
+.sp-editor-drill-geometry-preview svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.sp-editor-svg-measure-sandbox {
+    contain: layout style paint;
+}
+
+.sp-editor-drill-geometry-empty {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    text-align: center;
+}
+
+.sp-editor-drill-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 14px;
+    min-height: 48px;
+}
+
+.sp-editor-drill-geometry-caption {
+    margin: 6px 0 0;
+    color: #5b6b83;
+    font-size: 11px;
+}
+
+.sp-editor-drill-relation {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: #10203a;
+    font-size: 12px;
+}
+
+.sp-editor-drill-relation-origin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #0f9488;
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.sp-editor-drill-relation-arrow {
+    color: #5b6b83;
+    font-weight: 800;
+}
+
+.sp-editor-drill-relation-target {
+    min-width: 0;
+    overflow: hidden;
+    padding: 6px 8px;
+    border: 1px solid #9edbd2;
+    border-radius: 8px;
+    background: #e8f8f5;
+    color: #08756d;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sp-editor-drill-detail-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 180px;
+    color: #5b6b83;
+    text-align: center;
+}
+
+.sp-editor-svg-overlay {
+    align-items: stretch;
+    justify-content: center;
+    padding: 28px 32px 92px;
+    box-sizing: border-box;
+    background: #ffffff;
+}
+
 .sp-editor-svg-modal {
-    height: min(820px, 100%);
+    width: min(100%, 1220px);
+    max-width: 1220px;
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: 14px;
+    padding: 20px;
+    box-sizing: border-box;
+    border: 1px solid #d8e3ef;
+    border-radius: 20px;
+    background: #ffffff;
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.sp-editor-svg-modal.is-create {
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+}
+
+.sp-editor-svg-modal .sp-editor-footer {
+    padding: 0;
+    border-top: 0;
+    background: transparent;
+}
+
+.sp-editor-svg-name-label {
+    display: grid;
+    gap: 6px;
+    padding: 0;
+    color: #172033;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.sp-editor-svg-name-label input {
+    height: 42px;
+    border: 1px solid #d4dfeb;
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 12px;
+    outline: none;
 }
 
 .sp-editor-overlay-header,
@@ -794,22 +2106,26 @@ p {
 
 .sp-editor-codeframe {
     display: grid;
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: 72px minmax(0, 1fr);
     min-height: 0;
     height: 100%;
-    border: 1px solid #0f172a;
-    border-radius: 12px;
+    border: 1px solid #cfd9e6;
+    border-radius: 14px;
     overflow: hidden;
     background: #ffffff;
 }
 
 .sp-editor-svg-gutter {
     margin: 0;
-    padding: 16px 8px 16px 0;
+    min-height: 0;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 16px 12px;
     text-align: right;
-    color: #7b8796;
-    background: #f5f7fa;
-    border-right: 1px solid #e0e7ef;
+    user-select: none;
+    color: #718198;
+    background: #f4f7fb;
+    border-right: 1px solid #d8e3ef;
     font-family: Consolas, "Courier New", monospace;
     font-size: 13px;
     line-height: 1.6;
@@ -844,7 +2160,9 @@ p {
 
 @media (max-width: 760px) {
     .sp-editor-browser,
-    .sp-editor-detail-main {
+    .sp-editor-detail-main,
+    .sp-editor-drill-main,
+    .sp-editor-drill-config {
         grid-template-columns: 1fr;
     }
 

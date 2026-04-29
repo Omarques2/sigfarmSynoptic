@@ -10,8 +10,8 @@ const areaEnum =
 
 assert.deepEqual(
   areaEnum,
-  ["Solid", "Gradient"],
-  "area.colorMode deve expor apenas os modos Solid e Gradient."
+  ["Theme", "Solid", "Gradient"],
+  "area.colorMode deve expor Theme, Solid e Gradient, nessa ordem."
 );
 
 assert(
@@ -30,10 +30,11 @@ assert(
 
 assert(
   /public\s+colorMode\s*=\s*new formattingSettings\.ItemDropdown\(/.test(settingsTs) &&
+    /Tema do Power BI/.test(settingsTs) &&
     /Cor simples/.test(settingsTs) &&
     /Gradiente/.test(settingsTs) &&
     !/ConditionalFormattingNative/.test(settingsTs),
-  "settings.ts deve listar apenas Cor simples e Gradiente no dropdown."
+  "settings.ts deve listar Tema do Power BI, Cor simples e Gradiente no dropdown."
 );
 
 assert(
@@ -64,13 +65,27 @@ assert(
 );
 
 assert(
+  /public\s+colorMode:\s+string\s*=\s*"Theme";/.test(settingsTs) &&
+    /ThemeOrMatched/.test(settingsTs) &&
+    /return\s+"Theme";/.test(settingsTs),
+  "settings.ts deve usar Theme como default e fallback compatível."
+);
+
+assert(
+  /getPowerBIThemeColor/.test(visualTs) &&
+    /colorPalette\.getColor/.test(visualTs) &&
+    /this\.settings\.area\.colorMode\s*===\s*"Theme"/.test(visualTs),
+  "visual.ts deve resolver cores pelo tema do Power BI quando colorMode = Theme."
+);
+
+assert(
   /if\s*\(mode\s*===\s*"Gradient"\)/.test(visualTs),
   "visual.ts deve manter branch explícito para Gradient."
 );
 
 assert(
   /return\s+row\.nativeFill\s*\|\|\s*nativeFallbackFill\s*\|\|\s*matchedFill;/.test(visualTs),
-  "fora do Gradient, o visual deve usar cor resolvida por área, depois fallback estático e por fim matchedFill."
+  "modo Solid deve usar cor resolvida por área, depois fallback estático e por fim matchedFill."
 );
 
 console.log("Color mode regression checks passed.");

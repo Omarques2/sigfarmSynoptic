@@ -2,7 +2,7 @@
 
 Custom visual for Power BI that renders SVG synoptic panels with:
 - Conditional coloring by category
-- Optional solid fill or gradient fill by measure
+- Power BI theme palette, solid fill or gradient fill by measure
 - Value labels
 - Selection and cross-filter interaction
 - Zoom and pan
@@ -16,7 +16,8 @@ Custom visual for Power BI that renders SVG synoptic panels with:
 
 ## Color Modes
 
-The visual supports two area color modes in the format pane:
+The visual supports three area color modes in the format pane:
+- `Theme`: uses the current Power BI theme palette by category/area. This is the default so the visual follows the report theme and other visuals.
 - `Solid`: applies "Cor das areas" to matched areas. This picker exposes the native Power BI `fx` button, so rules, gradients and field-value/DAX conditional colors can resolve per area.
 - `Gradient`: uses the current measure to interpolate a three-color continuous scale from low to mid to high.
 

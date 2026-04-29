@@ -25,6 +25,16 @@ import { FormattingSettingsService } from "powerbi-visuals-utils-formattingmodel
 import { VisualSettings, SvgSettings, LabelsSettings, VisualFormattingSettingsModel } from "./settings";
 import { MapEditorDialog } from "./MapEditorDialog";
 import type { MapEditorDialogInitialState, MapEditorDialogResult } from "./MapEditorDialog";
+import {
+  resolveDrillMap,
+  validateMapRegistryManifestIssues
+} from "./drillMapResolver";
+import type {
+  DrillMapContext,
+  DrillMapResolutionTrace,
+  PendingDrillSource,
+  ValidationIssue
+} from "./drillMapResolver";
 
 // ===== helpers =====
 function norm(raw: any): string {
@@ -61,6 +71,15 @@ type ValueField = { label: string; value: any };
 type SelectionSource = "none" | "self" | "external";
 type RenderScopeMode = "AllMapAreas" | "DrillDataOnly";
 type DrillFocusPhase = "idle" | "mapResolved" | "domInserted" | "stylesApplied" | "focusApplied";
+type DrillClickRoute = {
+  sourceMapId: string;
+  sourceAreaId: string;
+  targetMapId: string;
+};
+type ResolvedMapAreaDefinition = {
+  key: string;
+  area: MapRegistryArea;
+};
 type CatRow = {
   key: string;
   rawKey: string;
@@ -97,6 +116,7 @@ type DrillSvgPruneResult = {
   keptIds: Set<string>;
   removedCount: number;
 };
+type DrillMode = "manual" | "automatic" | "none";
 type MapRegistryArea = {
   id?: string;
   virtualId?: string;
@@ -105,6 +125,7 @@ type MapRegistryArea = {
   aliases?: string[];
   metadata?: Record<string, unknown>;
   drillToMapId?: string;
+  drillMode?: DrillMode;
   labelAnchor?: { x: number; y: number };
   labelMode?: string;
   calloutSide?: "left" | "right" | "top" | "bottom" | "auto";
@@ -951,36 +972,6 @@ function bumpRecord(record: Record<string, number>, key: string) {
   record[k] = (record[k] || 0) + 1;
 }
 
-function sumRecord(record: Record<string, number>): number {
-  return Object.values(record).reduce((acc, v) => acc + v, 0);
-}
-
-function formatRecord(record: Record<string, number>, limit: number = 4): string {
-  const entries = Object.entries(record).sort((a, b) => b[1] - a[1]);
-  if (entries.length === 0) return "";
-  const shown = entries.slice(0, limit).map(([key, count]) => `${key} x${count}`);
-  const remaining = entries.length - shown.length;
-  return remaining > 0 ? `${shown.join(", ")}, +${remaining}` : shown.join(", ");
-}
-
-function buildSanitizationSummary(report: SanitizationReport, lang: UiLanguage): string | null {
-  const parts: string[] = [];
-  const tagCount = sumRecord(report.removedTags);
-  const attrCount = sumRecord(report.removedAttrs);
-
-  if (lang === "pt") {
-    if (tagCount > 0) parts.push(`tags (${formatRecord(report.removedTags)})`);
-    if (attrCount > 0) parts.push(`atributos (${formatRecord(report.removedAttrs)})`);
-    if (report.removedStyleParts > 0) parts.push(`estilos inseguros (${report.removedStyleParts})`);
-  } else {
-    if (tagCount > 0) parts.push(`tags (${formatRecord(report.removedTags)})`);
-    if (attrCount > 0) parts.push(`attributes (${formatRecord(report.removedAttrs)})`);
-    if (report.removedStyleParts > 0) parts.push(`unsafe styles (${report.removedStyleParts})`);
-  }
-
-  if (parts.length === 0) return null;
-  return lang === "pt" ? `Itens removidos: ${parts.join("; ")}.` : `Items removed: ${parts.join("; ")}.`;
-}
 const ALLOWED_SVG_TAGS = new Set([
   "svg",
   "g",
@@ -1579,6 +1570,9 @@ export class Visual implements IVisual {
   private pendingPotentialDrillSelectionIds: ISelectionId[] | null = null;
   private pendingPotentialDrillSelectionContext: { token: number; mapId: string; categoryName: string | null } | null = null;
   private potentialDrillVisualKey: string | null = null;
+  private pendingDrillSource: PendingDrillSource | null = null;
+  private lastDrillResolutionTrace: DrillMapResolutionTrace | null = null;
+  private drillRouteDiagnosticKeys = new Set<string>();
   private renderScope: RenderScopeState = {
     active: false,
     mode: "AllMapAreas",
@@ -1667,7 +1661,15 @@ export class Visual implements IVisual {
 
   // host env
   private hostEnv: number | undefined;
+  private lastUpdateOptions?: VisualUpdateOptions;
+  private canHostDrillControls = false;
+  private canHostDrillDown = false;
+  private canHostDrillUp = false;
+  private lastSetCanDrillValue: boolean | null = null;
+  private hasCategoryDrillHierarchy = false;
   private currentDrillPath: string[] = [];
+  private lastDataDrillLevel = 0;
+  private lastDataDrillPath: string[] = [];
   private activeCategoryQueryName: string | null = null;
   private svgAreaIdCache = new Map<string, Set<string>>();
   private activeMap: ActiveMapResolution = {
@@ -1853,7 +1855,11 @@ export class Visual implements IVisual {
     if (kind === "click") {
       const mouseEv = ev as MouseEvent;
       if (mouseEv.button !== 0 || !row) return;
-      this.selectRow(row, mouseEv.ctrlKey || mouseEv.metaKey, undefined, this.hasNextDrillMapForCurrentLevel());
+      const multiSelect = mouseEv.ctrlKey || mouseEv.metaKey;
+      const drillRoute = this.getDrillRouteForRow(row);
+      this.selectRow(row, multiSelect, undefined, drillRoute, {
+        suppressHostSelect: this.shouldSuppressHostSelectionForUnmappedDrill(drillRoute, multiSelect)
+      });
       return;
     }
     if (kind === "keydown") {
@@ -1861,7 +1867,11 @@ export class Visual implements IVisual {
       if (!row) return;
       if (keyEv.key === "Enter" || keyEv.key === " ") {
         keyEv.preventDefault();
-        this.selectRow(row, keyEv.ctrlKey || keyEv.metaKey, undefined, this.hasNextDrillMapForCurrentLevel());
+        const multiSelect = keyEv.ctrlKey || keyEv.metaKey;
+        const drillRoute = this.getDrillRouteForRow(row);
+        this.selectRow(row, multiSelect, undefined, drillRoute, {
+          suppressHostSelect: this.shouldSuppressHostSelectionForUnmappedDrill(drillRoute, multiSelect)
+        });
         return;
       }
       if (keyEv.key === "ContextMenu" || (keyEv.shiftKey && keyEv.key === "F10")) {
@@ -1918,7 +1928,9 @@ export class Visual implements IVisual {
   }
 
   private beginDrillFocusTransition(): void {
-    if (!this.settings.drillMaps.focusDataAreas || Number(this.activeMap.map?.level) <= 0) {
+    const currentLevel = Math.max(0, this.currentDrillPath.length - 1);
+    const isAreaOverride = this.lastDrillResolutionTrace?.reason === "areaOverride";
+    if (!this.settings.drillMaps.focusDataAreas || (currentLevel <= 0 && !isAreaOverride)) {
       this.cancelPendingDrillFocus();
       return;
     }
@@ -1943,14 +1955,13 @@ export class Visual implements IVisual {
   ): boolean {
     if (!hasSvg || !hadRenderableSvg || !this.settings.drillMaps.focusDataAreas) return false;
 
-    const nextLevel = Number(this.activeMap.map?.level);
-    if (!Number.isFinite(nextLevel) || nextLevel <= 0) return false;
-
     const changed = previousActiveMapId !== this.activeMap.mapId || previousCategoryName !== this.activeCategoryQueryName;
     if (!changed) return false;
 
     const previousLevel = Number.isFinite(previousLevelRaw) ? previousLevelRaw : 0;
-    return nextLevel > previousLevel || this.currentDrillPath.length > 1;
+    const currentLevel = Math.max(0, this.currentDrillPath.length - 1);
+    const resolvedByAreaOverride = this.lastDrillResolutionTrace?.reason === "areaOverride";
+    return resolvedByAreaOverride || currentLevel > previousLevel || (currentLevel > 0 && previousActiveMapId !== this.activeMap.mapId);
   }
 
   private clearDrillLoadingTimeout(): void {
@@ -2007,18 +2018,20 @@ export class Visual implements IVisual {
     this.hideDrillLoading();
   }
 
-  private hasNextDrillMapForCurrentLevel(): boolean {
-    if (!this.settings.drillMaps.enabled) return false;
-    const currentLevel = Number(this.activeMap.map?.level);
-    const safeCurrentLevel = Number.isFinite(currentLevel) ? currentLevel : 0;
-    return this.activeMap.manifest.maps.some((map) => {
-      if (!map || map.mapId === this.activeMap.mapId || !(map.svgText || "").trim()) return false;
-      const mapLevel = Number(map.level);
-      return Number.isFinite(mapLevel) && mapLevel > safeCurrentLevel;
-    });
+  private clearPotentialDrillClickTransition(restoreSelectionFocus: boolean): void {
+    const pendingSelectionIds = this.pendingPotentialDrillSelectionIds;
+    const wasSuppressed = this.suppressSelectionFocusForPotentialDrill;
+    this.clearPotentialDrillClickState(false);
+    if (restoreSelectionFocus && wasSuppressed && pendingSelectionIds) {
+      this.setSelectionFromIds(pendingSelectionIds, "self");
+      return;
+    }
+    if (restoreSelectionFocus && wasSuppressed && !this.pendingDrillFocus && this.selectedKeys.size > 0) {
+      this.applySelectionVisualState();
+    }
   }
 
-  private clearPotentialDrillClickTransition(restoreSelectionFocus: boolean): void {
+  private clearPotentialDrillClickState(clearPendingSource = true): void {
     if (this.potentialDrillClickTimer !== null) {
       window.clearTimeout(this.potentialDrillClickTimer);
       this.potentialDrillClickTimer = null;
@@ -2027,18 +2040,13 @@ export class Visual implements IVisual {
       window.clearTimeout(this.potentialDrillSelectionTimer);
       this.potentialDrillSelectionTimer = null;
     }
-    const pendingSelectionIds = this.pendingPotentialDrillSelectionIds;
     this.pendingPotentialDrillSelectionIds = null;
     this.pendingPotentialDrillSelectionContext = null;
     this.potentialDrillVisualKey = null;
-    const wasSuppressed = this.suppressSelectionFocusForPotentialDrill;
     this.suppressSelectionFocusForPotentialDrill = false;
-    if (restoreSelectionFocus && wasSuppressed && pendingSelectionIds) {
-      this.setSelectionFromIds(pendingSelectionIds, "self");
-      return;
-    }
-    if (restoreSelectionFocus && wasSuppressed && !this.pendingDrillFocus && this.selectedKeys.size > 0) {
-      this.applySelectionVisualState();
+    this.hideDrillLoading();
+    if (clearPendingSource) {
+      this.pendingDrillSource = null;
     }
   }
 
@@ -2062,18 +2070,12 @@ export class Visual implements IVisual {
     if (this.pendingDrillFocus || token !== this.drillFocusToken) return;
     const context = this.pendingPotentialDrillSelectionContext;
     if (context && (context.mapId !== this.activeMap.mapId || context.categoryName !== this.activeCategoryQueryName)) {
-      this.pendingPotentialDrillSelectionIds = null;
-      this.pendingPotentialDrillSelectionContext = null;
-      this.potentialDrillVisualKey = null;
+      this.clearPotentialDrillClickState(true);
       return;
     }
     const pendingSelectionIds = this.pendingPotentialDrillSelectionIds;
     if (!pendingSelectionIds) return;
-    this.pendingPotentialDrillSelectionIds = null;
-    this.pendingPotentialDrillSelectionContext = null;
-    this.potentialDrillVisualKey = null;
-    this.suppressSelectionFocusForPotentialDrill = false;
-    this.hideDrillLoading();
+    this.clearPotentialDrillClickState(true);
     this.setSelectionFromIds(pendingSelectionIds, "self");
   }
 
@@ -2097,15 +2099,7 @@ export class Visual implements IVisual {
       const stillSameLevel = this.activeMap.mapId === mapId && this.activeCategoryQueryName === categoryName;
       if (stillSameLevel) {
         const pendingSelectionIds = this.pendingPotentialDrillSelectionIds;
-        this.pendingPotentialDrillSelectionIds = null;
-        this.pendingPotentialDrillSelectionContext = null;
-        this.potentialDrillVisualKey = null;
-        this.suppressSelectionFocusForPotentialDrill = false;
-        this.hideDrillLoading();
-        if (this.potentialDrillSelectionTimer !== null) {
-          window.clearTimeout(this.potentialDrillSelectionTimer);
-          this.potentialDrillSelectionTimer = null;
-        }
+        this.clearPotentialDrillClickState(true);
         if (pendingSelectionIds) {
           this.setSelectionFromIds(pendingSelectionIds, "self");
           return;
@@ -2113,10 +2107,7 @@ export class Visual implements IVisual {
         this.applyLabelZoomCompensation();
         return;
       }
-      this.pendingPotentialDrillSelectionIds = null;
-      this.pendingPotentialDrillSelectionContext = null;
-      this.potentialDrillVisualKey = null;
-      this.suppressSelectionFocusForPotentialDrill = false;
+      this.clearPotentialDrillClickState(true);
     }, this.potentialDrillFocusSuppressionMs);
   }
 
@@ -2147,6 +2138,144 @@ export class Visual implements IVisual {
     this.focusElements([el]);
   }
 
+  private getRowAreaId(row: CatRow): string {
+    const el = this.getRegionElementForRow(row);
+    const areaId = ((el as any)?.id || row.rawKey || row.legendRawKey || row.key || "").toString();
+    return areaId;
+  }
+
+  private getDrillRouteForRow(row: CatRow): DrillClickRoute | null {
+    if (!this.settings.drillMaps.enabled) return null;
+    if (!this.canHostDrillDown) return null;
+    const svgAreaId = this.getRowAreaId(row);
+    if (!svgAreaId) return null;
+    const resolvedArea = this.findAreaDefinitionForRuntime(svgAreaId);
+    const areaOverride = resolvedArea?.area;
+    const resolvedAreaKey = this.getAreaManifestKeyForRuntime(svgAreaId);
+    if (!areaOverride) {
+      this.warnDrillRouteDiagnostic("Area clicada nao encontrou configuracao no manifesto.", {
+        svgAreaId,
+        mapId: this.activeMap.mapId,
+        availableAreaKeys: Object.keys(this.activeMap.map?.areas || {}).slice(0, 20)
+      });
+      return null;
+    }
+    if (areaOverride.drillMode === "none") return null;
+    const targetMapId = areaOverride?.drillToMapId;
+    if (!targetMapId) {
+      this.warnDrillRouteDiagnostic("Area encontrada, mas sem drillToMapId.", {
+        svgAreaId,
+        areaKey: resolvedAreaKey,
+        mapId: this.activeMap.mapId,
+        drillMode: areaOverride.drillMode
+      });
+      return null;
+    }
+    if (targetMapId === this.activeMap.mapId) return null;
+    const targetMap = this.activeMap.manifest.maps.find((map) => map.mapId === targetMapId);
+    if (!targetMap || !(targetMap.svgText || "").trim()) {
+      this.warnDrillRouteDiagnostic("drillToMapId aponta para mapa inexistente ou sem SVG.", {
+        svgAreaId,
+        areaKey: resolvedAreaKey,
+        targetMapId
+      });
+      return null;
+    }
+    return {
+      sourceMapId: this.activeMap.mapId,
+      sourceAreaId: svgAreaId,
+      targetMapId
+    };
+  }
+
+  private getCurrentDataDrillLevel(): number {
+    return Math.max(0, this.currentDrillPath.length - 1);
+  }
+
+  private getCurrentResolvedLevel(): number {
+    const pathLevel = this.getCurrentDataDrillLevel();
+    const mapLevel = Number(this.activeMap?.map?.level);
+    if (Number.isFinite(mapLevel) && mapLevel >= 0) {
+      return Math.max(pathLevel, mapLevel);
+    }
+    return pathLevel;
+  }
+
+  private getDrillNavigationDirection(currentLevel: number, currentPath: string[] = this.currentDrillPath): "down" | "up" | "same" {
+    if (currentLevel > this.lastDataDrillLevel) return "down";
+    if (currentLevel < this.lastDataDrillLevel) return "up";
+    const currentPathKey = currentPath.map((part) => norm(part)).join("\u0000");
+    const lastPathKey = this.lastDataDrillPath.map((part) => norm(part)).join("\u0000");
+    if (currentPathKey !== lastPathKey) return "same";
+    return "same";
+  }
+
+  private capturePendingDrillSource(route: DrillClickRoute): void {
+    this.pendingDrillSource = {
+      sourceMapId: route.sourceMapId,
+      sourceAreaId: route.sourceAreaId,
+      targetMapId: route.targetMapId,
+      sourceLevel: this.getCurrentDataDrillLevel(),
+      sourcePath: [...this.currentDrillPath]
+    };
+  }
+
+  private activeMapHasExplicitNextDrillTarget(): boolean {
+    const manifest = this.activeMap?.manifest;
+    const map = this.activeMap?.map;
+    if (!manifest || !map?.areas) return false;
+
+    return Object.values(map.areas).some((area) => {
+      if (!area?.drillToMapId) return false;
+      if (area.drillMode === "none") return false;
+      const target = manifest.maps.find((candidate) => candidate.mapId === area.drillToMapId);
+      return !!target?.svgText?.trim();
+    });
+  }
+
+  private updateHostDrillState(dv?: DataView): void {
+    const dataRoles = (dv as any)?.metadata?.dataRoles;
+    const drillableRoles = dataRoles?.drillableRoles;
+    const categoryDrillTypes = drillableRoles?.category;
+    const drillTypes = Array.isArray(categoryDrillTypes) ? categoryDrillTypes : [];
+    const categoryColumnCount = this.getCategoryColumns(dv).length;
+    const currentLevel = this.getCurrentResolvedLevel();
+    const hostReportsDrillUp = drillTypes.includes(1);
+    const hostReportsDrillDown = drillTypes.length > 0 ? drillTypes.includes(2) : categoryColumnCount > 1;
+    const hostReportsAnyDrill = drillTypes.length > 0;
+    const hasHierarchyInDataView = categoryColumnCount > 1;
+    const isInsideDrillHierarchy = currentLevel > 0;
+    const activeMapHasNext = this.activeMapHasExplicitNextDrillTarget();
+
+    this.hasCategoryDrillHierarchy =
+      hasHierarchyInDataView ||
+      isInsideDrillHierarchy ||
+      hostReportsAnyDrill;
+
+    this.canHostDrillDown =
+      this.settings.drillMaps.enabled &&
+      activeMapHasNext &&
+      (hostReportsDrillDown || hasHierarchyInDataView || isInsideDrillHierarchy);
+
+    this.canHostDrillUp = isInsideDrillHierarchy || hostReportsDrillUp;
+
+    const shouldEnableDrillControls =
+      this.settings.drillMaps.enabled &&
+      this.hasCategoryDrillHierarchy &&
+      (this.canHostDrillUp || this.canHostDrillDown || isInsideDrillHierarchy || activeMapHasNext);
+
+    this.canHostDrillControls = shouldEnableDrillControls;
+    const setCanDrill = (this.host as any)?.setCanDrill;
+    if (typeof setCanDrill === "function" && this.lastSetCanDrillValue !== shouldEnableDrillControls) {
+      try {
+        setCanDrill.call(this.host, shouldEnableDrillControls);
+        this.lastSetCanDrillValue = shouldEnableDrillControls;
+      } catch {
+        // Older hosts can expose the method but reject it in some surfaces.
+      }
+    }
+  }
+
   private syncSelectionFromHighlights(): boolean {
     if (!this.hasHighlights) return false;
     this.selectionSource = "external";
@@ -2155,29 +2284,55 @@ export class Visual implements IVisual {
     return true;
   }
 
-  private selectRow(row: CatRow, multiSelect: boolean, after?: () => void, potentialDrillClick = false) {
+  private applyLocalRowSelection(row: CatRow, multiSelect: boolean): void {
+    this.selectionSource = "self";
+    if (multiSelect) {
+      if (this.selectedKeys.has(row.key)) this.selectedKeys.delete(row.key);
+      else this.selectedKeys.add(row.key);
+    } else {
+      this.selectedKeys.clear();
+      this.selectedKeys.add(row.key);
+    }
+    this.applySelectionVisualState();
+  }
+
+  private shouldSuppressHostSelectionForUnmappedDrill(drillRoute: DrillClickRoute | null, multiSelect: boolean): boolean {
+    if (multiSelect) return false;
+    if (!this.settings.drillMaps.enabled) return false;
+    if (!this.canHostDrillDown) return false;
+    return !drillRoute;
+  }
+
+  private selectRow(
+    row: CatRow,
+    multiSelect: boolean,
+    after?: () => void,
+    drillRoute: DrillClickRoute | null = null,
+    options: { suppressHostSelect?: boolean } = {}
+  ) {
     this.selectionSource = "self";
     this.cancelPendingDrillFocus();
-    const deferPotentialDrillSelection = potentialDrillClick && !multiSelect;
-    if (deferPotentialDrillSelection) {
+    const deferPotentialDrillSelection = !!drillRoute && !multiSelect;
+    if (deferPotentialDrillSelection && drillRoute) {
       this.armPotentialDrillClickTransition();
+      this.capturePendingDrillSource(drillRoute);
       this.preFocusPotentialDrillSource(row);
     } else {
+      this.pendingDrillSource = null;
       this.clearRegionHoverState();
     }
-    const applyLocalSelection = () => {
-      if (multiSelect) {
-        if (this.selectedKeys.has(row.key)) this.selectedKeys.delete(row.key);
-        else this.selectedKeys.add(row.key);
-      } else {
-        this.selectedKeys.clear();
-        this.selectedKeys.add(row.key);
-      }
-      this.applySelectionVisualState();
-    };
+
+    if (options.suppressHostSelect) {
+      this.pendingDrillSource = null;
+      this.clearPotentialDrillClickState(true);
+      this.clearRegionHoverState();
+      this.applyLocalRowSelection(row, multiSelect);
+      after?.();
+      return;
+    }
 
     if (!this.selectionManager?.select) {
-      applyLocalSelection();
+      this.applyLocalRowSelection(row, multiSelect);
       after?.();
       return;
     }
@@ -2190,12 +2345,13 @@ export class Visual implements IVisual {
           after?.();
         })
         .catch(() => {
+          this.clearPotentialDrillClickState(true);
           after?.();
         });
       return;
     }
 
-    applyLocalSelection();
+    this.applyLocalRowSelection(row, multiSelect);
     this.selectionManager
       .select(row.identity as any, multiSelect)
       .then((ids) => {
@@ -2468,36 +2624,24 @@ export class Visual implements IVisual {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "sp-editor-open";
-    button.textContent = "Editor";
     button.setAttribute("aria-label", "Abrir editor de mapa");
-    Object.assign(button.style, {
-      position: "absolute",
-      top: "10px",
-      right: "110px",
-      zIndex: "30",
-      padding: "8px 10px",
-      borderRadius: "10px",
-      border: "1px solid rgba(255,255,255,0.2)",
-      background: "rgba(0,0,0,0.22)",
-      color: "#fff",
-      cursor: "pointer",
-      fontFamily: "Segoe UI, -apple-system, Roboto, Arial, sans-serif",
-      fontSize: "12px",
-      opacity: "0.55",
-      transition: "opacity 120ms ease, transform 120ms ease",
-      userSelect: "none",
-      display: "none"
-    } as CSSStyleDeclaration);
-    button.addEventListener("mouseenter", () => {
-      button.style.opacity = "1";
-      button.style.transform = "translateY(-1px)";
-    });
-    button.addEventListener("mouseleave", () => {
-      button.style.opacity = "0.55";
-      button.style.transform = "translateY(0)";
-    });
+    button.setAttribute("aria-hidden", "true");
+    button.tabIndex = -1;
+
+    const icon = document.createElement("span");
+    icon.className = "sp-editor-open-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "</>";
+
+    const label = document.createElement("span");
+    label.textContent = "Editor";
+
+    button.append(icon, label);
     button.addEventListener("click", () => {
-      if (this.canUseModalEditor()) {
+      const hasSvgConfigured = !!(this.activeMap?.svgText || "").trim();
+      if (!this.canShowEditorButton(this.lastUpdateOptions, hasSvgConfigured)) return;
+
+      if (this.canUseModalEditor(this.lastUpdateOptions)) {
         void this.openMapEditorDialog();
         return;
       }
@@ -2507,9 +2651,19 @@ export class Visual implements IVisual {
     return button;
   }
 
-  private canUseModalEditor(): boolean {
+  private canExposeEditorUi(options?: VisualUpdateOptions): boolean {
+    if (!this.settings.editor.enabled) return false;
+    if (!this.canShowSvgPickerUI()) return false;
+    return true;
+  }
+
+  private canShowEditorButton(options?: VisualUpdateOptions, hasSvgConfigured = false): boolean {
+    return this.canExposeEditorUi(options) && this.settings.editor.showEditorButton && hasSvgConfigured;
+  }
+
+  private canUseModalEditor(options?: VisualUpdateOptions): boolean {
     return (
-      this.settings.editor.enabled &&
+      this.canExposeEditorUi(options) &&
       typeof (this.host as any)?.openModalDialog === "function" &&
       !!(this.host as any)?.hostCapabilities?.allowModalDialog
     );
@@ -2534,12 +2688,22 @@ export class Visual implements IVisual {
       areaSearch: this.editorAreaSearch,
       inspectorTab: this.editorInspectorTab === "Drill" ? "Drill" : "General",
       allowMapUploads: this.canShowSvgPickerUI(),
-      rowsByKey
+      rowsByKey,
+      drillContext: {
+        currentDrillPath: [...this.currentDrillPath],
+        currentLevel: Math.max(0, this.currentDrillPath.length - 1),
+        categoryFieldNames: [...this.currentDrillPath],
+        activeCategoryQueryName: this.activeCategoryQueryName,
+        resolvedMapId: this.activeMap.mapId,
+        candidateMaps: this.lastDrillResolutionTrace?.candidates || [],
+        resolutionReason: this.lastDrillResolutionTrace?.reason || "none",
+        warnings: this.lastDrillResolutionTrace?.warnings || []
+      }
     };
   }
 
   private async openMapEditorDialog(): Promise<void> {
-    if (!this.canUseModalEditor()) {
+    if (!this.canUseModalEditor(this.lastUpdateOptions)) {
       this.setEditorOpen(true);
       return;
     }
@@ -2551,8 +2715,10 @@ export class Visual implements IVisual {
     }
 
     const win = this.container.ownerDocument?.defaultView;
-    const width = Math.max(960, Math.floor((win?.innerWidth || 1600) * 0.76));
-    const height = Math.max(680, Math.floor((win?.innerHeight || 900) * 0.78));
+    const viewportWidth = win?.innerWidth || 1600;
+    const viewportHeight = win?.innerHeight || 900;
+    const width = Math.min(1360, Math.max(1120, Math.floor(viewportWidth * 0.9)));
+    const height = Math.min(900, Math.max(720, Math.floor(viewportHeight * 0.88)));
 
     try {
       const dialogResult = (await dialogHost.call(
@@ -2603,7 +2769,7 @@ export class Visual implements IVisual {
 
   private setEditorOpen(open: boolean): void {
     this.editorOpen = open;
-    this.renderAdvancedEditor(undefined, undefined);
+    this.renderAdvancedEditor(this.lastUpdateOptions, undefined);
   }
 
   private createUploadUI() {
@@ -2677,15 +2843,15 @@ export class Visual implements IVisual {
       const dataUri = "data:image/svg+xml;utf8," + encodeURIComponent(text);
       this.persistSvgText(dataUri);
       this.seedDraftFromUploadedSvg(dataUri, file.name, false);
-      this.editorOpen = !this.canUseModalEditor();
+      this.editorOpen = !this.canUseModalEditor(this.lastUpdateOptions);
       this.editorViewMode = "browser";
 
       this.fileInput.value = "";
-      if (this.canUseModalEditor()) {
+      if (this.canUseModalEditor(this.lastUpdateOptions)) {
         void this.openMapEditorDialog();
         return;
       }
-      this.renderAdvancedEditor(undefined, undefined);
+      this.renderAdvancedEditor(this.lastUpdateOptions, undefined);
     });
     this.container.appendChild(this.fileInput);
 
@@ -2785,12 +2951,12 @@ export class Visual implements IVisual {
       fontWeight: "700",
       marginBottom: "4px"
     } as CSSStyleDeclaration);
-    this.svgWarningTitle.textContent = "Aviso: SVG sanitizado";
+    this.svgWarningTitle.textContent = "";
 
     this.svgWarningCloseBtn = document.createElement("button");
     this.svgWarningCloseBtn.type = "button";
     this.svgWarningCloseBtn.textContent = "×";
-    this.svgWarningCloseBtn.setAttribute("aria-label", "Fechar aviso");
+    this.svgWarningCloseBtn.setAttribute("aria-label", "Fechar");
     Object.assign(this.svgWarningCloseBtn.style, {
       border: "none",
       background: "transparent",
@@ -2830,50 +2996,26 @@ export class Visual implements IVisual {
     svgSig: string | null,
     forceShow: boolean = false
   ) {
-    if (!this.svgWarning) return;
-    if (!this.canShowSvgPickerUI()) {
-      this.svgWarning.style.display = "none";
-      this.svgWarningBody.textContent = "";
-      return;
-    }
-    const svgChanged = !!svgSig && this.lastSvgSig !== svgSig;
+    void forceShow;
+    const hasReportChanges =
+      !!report &&
+      (Object.keys(report.removedTags).length > 0 ||
+        Object.keys(report.removedAttrs).length > 0 ||
+        report.removedStyleParts > 0);
     this.currentSvgSig = svgSig;
     if (svgSig) {
       this.lastSvgSig = svgSig;
       this.writeStoredValue(UI_STORAGE_KEYS.lastSvgSig, svgSig);
     }
-    const warningLang = resolveLanguage(this.settings?.ui?.language);
-    const summary = report ? buildSanitizationSummary(report, warningLang) : null;
-    if (this.svgWarningTitle) {
-      this.svgWarningTitle.textContent = warningLang === "pt" ? "Aviso: SVG sanitizado" : "Warning: SVG sanitized";
-    }
-    if (this.svgWarningCloseBtn) {
-      this.svgWarningCloseBtn.setAttribute(
-        "aria-label",
-        warningLang === "pt" ? "Fechar aviso" : "Close warning"
-      );
-    }
-    this.lastSanitizationReport = summary ? report : null;
-    this.lastSanitizationSig = summary ? svgSig : null;
-    const alwaysShow = !!this.settings?.svgSettings?.alwaysShowWarning;
-    let warningEnabled = !!this.settings?.warning?.show;
-    const shouldResetOnSvgChange = !!summary && svgChanged;
-    if (shouldResetOnSvgChange && !warningEnabled) {
-      this.persistWarningShow(true);
-      warningEnabled = true;
-      if (this.settings?.warning) {
-        this.settings.warning.show = true;
-      }
-    }
-    const dismissedForThisSvg = !!svgSig && this.warningDismissedSig === svgSig && !svgChanged;
-    const allowByToggle = warningEnabled || forceShow || shouldResetOnSvgChange;
-    if (!summary || !allowByToggle || (!alwaysShow && dismissedForThisSvg && !forceShow && !shouldResetOnSvgChange)) {
+    this.lastSanitizationReport = hasReportChanges ? report : null;
+    this.lastSanitizationSig = hasReportChanges ? svgSig : null;
+    this.warningForceShow = false;
+    this.lastWarningShow = false;
+    if (this.svgWarning) {
       this.svgWarning.style.display = "none";
-      this.svgWarningBody.textContent = "";
-      return;
     }
-    this.svgWarningBody.textContent = summary;
-    this.svgWarning.style.display = "block";
+    if (this.svgWarningTitle) this.svgWarningTitle.textContent = "";
+    if (this.svgWarningBody) this.svgWarningBody.textContent = "";
   }
 
   private createHelpOverlay(): HTMLDivElement {
@@ -2964,13 +3106,11 @@ export class Visual implements IVisual {
           ]
         },
         {
-          title: "Tip 3: Sanitization warnings",
+          title: "Tip 3: SVG security",
           bullets: [
-            "If unsafe content is removed, a warning appears.",
-            "The visual shows a sanitized version of the SVG.",
-            "The warning appears in the bottom-left corner.",
-            "Use this to review and fix the source file.",
-            "When you change the SVG, the warning reappears if needed."
+            "The visual cleans SVG markup before rendering.",
+            "Scripts, event handlers and unsafe external references are removed.",
+            "Prefer clean SVGs with unique and stable IDs."
           ]
         },
         {
@@ -3022,13 +3162,11 @@ export class Visual implements IVisual {
         ]
       },
       {
-        title: "Dica 3: Avisos de sanitizacao",
+        title: "Dica 3: Seguranca do SVG",
         bullets: [
-          "Quando algo inseguro e removido, um aviso aparece.",
-          "O visual mostra uma versao sanitizada do SVG.",
-          "O aviso aparece no canto inferior esquerdo.",
-          "Use isso para revisar e corrigir o arquivo original.",
-          "Ao trocar o SVG, o aviso volta se houver limpeza."
+          "O visual limpa o SVG automaticamente antes de renderizar.",
+          "Scripts, eventos e referencias externas inseguras sao removidos.",
+          "Prefira SVGs limpos, com IDs unicos e estaveis."
         ]
       },
       {
@@ -3369,10 +3507,15 @@ export class Visual implements IVisual {
     this.uploadCta.style.display = !hasSvgConfigured && allow ? "flex" : "none";
   }
 
-  private setEditorButtonVisibility(hasSvgConfigured: boolean) {
+  private setEditorButtonVisibility(hasSvgConfigured: boolean, options?: VisualUpdateOptions) {
     if (!this.editorButton) return;
-    const allow = this.settings.editor.enabled && this.settings.editor.showEditorButton;
-    this.editorButton.style.display = allow && hasSvgConfigured ? "block" : "none";
+    const show = this.canShowEditorButton(options, hasSvgConfigured);
+    this.editorButton.style.display = show ? "inline-flex" : "none";
+    this.editorButton.setAttribute("aria-hidden", show ? "false" : "true");
+    this.editorButton.tabIndex = show ? 0 : -1;
+    if (!show && this.editorOpen) {
+      this.editorOpen = false;
+    }
   }
 
   private showNoSvgMessageOutsideDesktop() {
@@ -3553,6 +3696,7 @@ export class Visual implements IVisual {
       this.settings.drillMaps.enabled &&
       this.settings.drillMaps.normalizeDrillFocus &&
       this.settings.drillMaps.drillRenderScopeMode === "DrillDataOnly" &&
+      this.settings.drillMaps.noDataBehavior === "Hide" &&
       Number(this.activeMap.map?.level) > 0 &&
       this.dataMap.size > 0
     );
@@ -3770,6 +3914,7 @@ export class Visual implements IVisual {
       this.settings.drillMaps.enabled &&
       this.settings.drillMaps.normalizeDrillFocus &&
       this.settings.drillMaps.drillRenderScopeMode === "DrillDataOnly" &&
+      this.settings.drillMaps.noDataBehavior === "Hide" &&
       state.bound.length > 0 &&
       Number(this.activeMap.map?.level) > 0
         ? "DrillDataOnly"
@@ -4207,14 +4352,32 @@ export class Visual implements IVisual {
 
   private getThemeColorForKey(key: string): string | null {
     try {
-      const palette = (this.host as any)?.colorPalette;
-      if (!palette?.getColor) return null;
-      const color = palette.getColor(key);
+      const colorPalette = (this.host as any)?.colorPalette;
+      if (!colorPalette?.getColor) return null;
+      const color = colorPalette.getColor(key);
       const value = (color as any)?.value;
-      return typeof value === "string" ? value : null;
+      return typeof value === "string" && value.trim() ? value : null;
     } catch {
       return null;
     }
+  }
+
+  private getThemeColorKey(
+    row: Pick<CatRow, "rawKey" | "legendRawKey" | "colorKey"> | undefined,
+    areaId: string
+  ): string {
+    const candidates = [row?.colorKey, row?.legendRawKey, row?.rawKey, areaId];
+    const value = candidates.find((candidate) => typeof candidate === "string" && candidate.trim().length > 0);
+    return String(value || areaId || "area");
+  }
+
+  private getPowerBIThemeColor(
+    row: Pick<CatRow, "rawKey" | "legendRawKey" | "colorKey"> | undefined,
+    areaId: string,
+    fallback: string
+  ): string {
+    const color = this.getThemeColorForKey(this.getThemeColorKey(row, areaId));
+    return color || fallback;
   }
 
   private isHighContrastMode(): boolean {
@@ -4265,6 +4428,28 @@ export class Visual implements IVisual {
   private getCategoryColumnName(column?: DataViewCategoryColumn | null): string | null {
     const name = column?.source?.queryName || column?.source?.displayName || "";
     return typeof name === "string" && name.trim().length > 0 ? name : null;
+  }
+
+  private getSingleCategoryValue(column: DataViewCategoryColumn): string | null {
+    const unique = new Set<string>();
+    for (const value of column.values || []) {
+      const text = String(value ?? "").trim();
+      if (!text) continue;
+      unique.add(text);
+      if (unique.size > 1) return null;
+    }
+    return unique.size === 1 ? Array.from(unique)[0] : null;
+  }
+
+  private getCurrentDrillValuePath(categoryColumns: DataViewCategoryColumn[]): string[] {
+    if (categoryColumns.length <= 1) return [];
+    const path: string[] = [];
+    for (const column of categoryColumns.slice(0, categoryColumns.length - 1)) {
+      const value = this.getSingleCategoryValue(column);
+      if (!value) return [];
+      path.push(value);
+    }
+    return path;
   }
 
   private isRenderableAreaElement(el: Element): boolean {
@@ -4320,25 +4505,30 @@ export class Visual implements IVisual {
   private resolveActiveMapFromDrillPath(defaultSvgText: string, dv?: DataView): ActiveMapResolution {
     const manifest = parseMapRegistryManifest(this.settings.mapRegistry.manifestJson);
     const categoryColumns = this.getCategoryColumns(dv);
-    const normalizedCurrentPath = categoryColumns
+    const currentPath = categoryColumns
       .map((column) => this.getCategoryColumnName(column))
       .filter((name): name is string => !!name)
-      .map((name) => norm(name));
-    this.currentDrillPath = normalizedCurrentPath;
+      .map((name) => name.trim())
+      .filter((name) => !!name);
+    const currentValuePath = this.getCurrentDrillValuePath(categoryColumns);
+    this.currentDrillPath = currentPath;
     const currentLevel = Math.max(0, categoryColumns.length - 1);
+    const navDirection = this.getDrillNavigationDirection(currentLevel, currentPath);
     const currentCategory = categoryColumns[currentLevel] || categoryColumns[categoryColumns.length - 1] || null;
     this.activeCategoryQueryName = this.getCategoryColumnName(currentCategory);
-    const mapByDefault =
-      (manifest.defaultMapId && manifest.maps.find((map) => map.mapId === manifest.defaultMapId)) || manifest.maps[0] || null;
-    let map: MapRegistryMap | null = null;
-
-    let bestMatch:
-      | {
-          map: MapRegistryMap;
-          categoryName: string | null;
-          score: number;
-        }
-      | null = null;
+    const categoryMatchScores: DrillMapContext["categoryMatchScores"] = {};
+    let pendingDrillSource = this.pendingDrillSource;
+    if (pendingDrillSource) {
+      const sourcePath = pendingDrillSource.sourcePath || [];
+      const sourceStillPrefix = sourcePath.every((part, index) => norm(part) === norm(currentPath[index]));
+      const awaitingNativeDrill =
+        currentLevel === pendingDrillSource.sourceLevel && navDirection === "same" && sourceStillPrefix;
+      const advancedExactlyOneLevel = currentLevel === pendingDrillSource.sourceLevel + 1 && sourceStillPrefix;
+      if (!awaitingNativeDrill && !advancedExactlyOneLevel) {
+        pendingDrillSource = null;
+        this.clearPotentialDrillClickState(true);
+      }
+    }
 
     if (this.settings.drillMaps.enabled && categoryColumns.length > 0) {
       manifest.maps.forEach((candidate) => {
@@ -4349,39 +4539,66 @@ export class Visual implements IVisual {
           const levelBonus = Number.isFinite(candidate.level) && candidate.level === categoryIndex ? 1 : 0;
           const currentLevelBonus = categoryIndex === currentLevel ? 2 : 0;
           const score = rawScore + levelBonus + currentLevelBonus;
-          if (!bestMatch || score > bestMatch.score) {
-            bestMatch = {
-              map: candidate,
-              categoryName: this.getCategoryColumnName(column),
-              score
+          const existing = categoryMatchScores[candidate.mapId];
+          if (!existing || score > existing.score) {
+            categoryMatchScores[candidate.mapId] = {
+              score,
+              categoryName: this.getCategoryColumnName(column)
             };
           }
         });
       });
     }
 
-    if (this.settings.drillMaps.enabled) {
-      map =
-        (bestMatch && bestMatch.score > 0 ? bestMatch.map : null) ||
-        manifest.maps.find((candidate) => {
-          if (Number.isFinite(candidate.level) && candidate.level === currentLevel) {
-            return true;
-          }
-          if (!candidate.drillPath || candidate.drillPath.length === 0) return false;
-          const candidatePath = candidate.drillPath.map((p) => norm(p));
-          if (candidatePath.length !== normalizedCurrentPath.length) return false;
-          return candidatePath.every((part, index) => part === normalizedCurrentPath[index]);
-        }) || null;
+    const normalizedValuePath = currentValuePath.map((part) => norm(part)).filter(Boolean);
+    const hasExplicitValuePathMap = manifest.maps.some((map) => {
+      const mapPath = Array.isArray(map.drillPath) ? map.drillPath.map((part) => norm(part)).filter(Boolean) : [];
+      return (
+        mapPath.length > 0 &&
+        mapPath.length === normalizedValuePath.length &&
+        mapPath.every((part, index) => part === normalizedValuePath[index])
+      );
+    });
+    const requireExplicitDrillPath =
+      this.settings.drillMaps.enabled &&
+      currentLevel > 0 &&
+      normalizedValuePath.length === currentLevel &&
+      !pendingDrillSource &&
+      !hasExplicitValuePathMap;
+
+    const resolution = resolveDrillMap(
+      manifest,
+      {
+        currentDrillPath: currentPath,
+        currentDrillValuePath: currentValuePath,
+        currentLevel,
+        categoryFieldNames: currentPath,
+        activeCategoryQueryName: this.activeCategoryQueryName,
+        pendingDrillSource,
+        categoryMatchScores,
+        requireExplicitDrillPath
+      },
+      {
+        enabled: this.settings.drillMaps.enabled,
+        fallbackToDefaultMap: this.settings.drillMaps.fallbackToDefaultMap
+      }
+    );
+    this.lastDrillResolutionTrace = resolution;
+
+    const selectedTrace = resolution.mapId
+      ? resolution.candidates.find((candidate) => candidate.mapId === resolution.mapId)
+      : null;
+    if (selectedTrace?.autoMatchCategoryName && resolution.reason === "automatch") {
+      this.activeCategoryQueryName = selectedTrace.autoMatchCategoryName;
     }
 
-    if (bestMatch?.categoryName) {
-      this.activeCategoryQueryName = bestMatch.categoryName;
+    if (pendingDrillSource && currentLevel === pendingDrillSource.sourceLevel + 1) {
+      this.clearPotentialDrillClickState(true);
     }
+    this.lastDataDrillLevel = currentLevel;
+    this.lastDataDrillPath = [...currentPath];
 
-    if (!map && this.settings.drillMaps.fallbackToDefaultMap) {
-      map = mapByDefault;
-    }
-
+    const map = (resolution.map as MapRegistryMap | null) || null;
     const svgText = (map?.svgText || defaultSvgText || "").trim();
     return {
       manifest,
@@ -4391,10 +4608,48 @@ export class Visual implements IVisual {
     };
   }
 
-  private getAreaManifestOverride(areaId: string): MapRegistryArea | undefined {
+  private findAreaDefinitionForRuntime(areaId: string): ResolvedMapAreaDefinition | null {
     const areas = this.activeMap.map?.areas;
-    if (!areas) return undefined;
-    return areas[areaId] || areas[norm(areaId)] || areas[areaId.toLowerCase()];
+    if (!areas) return null;
+
+    const raw = String(areaId || "").trim();
+    if (!raw) return null;
+    const normalized = norm(raw);
+    const lower = raw.toLowerCase();
+
+    const directCandidates = [raw, normalized, lower];
+    for (const key of directCandidates) {
+      const area = areas[key];
+      if (area) return { key, area };
+    }
+
+    for (const [key, area] of Object.entries(areas)) {
+      const candidates = [
+        key,
+        area.id,
+        area.virtualId,
+        area.bindKey,
+        area.displayName,
+        ...(Array.isArray(area.aliases) ? area.aliases : [])
+      ]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+        .map((value) => norm(value));
+
+      if (candidates.includes(normalized)) {
+        return { key, area };
+      }
+    }
+
+    return null;
+  }
+
+  private getAreaManifestOverride(areaId: string): MapRegistryArea | undefined {
+    return this.findAreaDefinitionForRuntime(areaId)?.area;
+  }
+
+  private getAreaManifestKeyForRuntime(areaId: string): string {
+    return this.findAreaDefinitionForRuntime(areaId)?.key || areaId;
   }
 
   private isAreaHidden(areaId: string): boolean {
@@ -4410,12 +4665,15 @@ export class Visual implements IVisual {
   private getBoundRowForElementId(areaId: string): CatRow | undefined {
     const direct = this.dataMap.get(norm(areaId));
     if (direct) return direct;
-    const override = this.getAreaManifestOverride(areaId);
+    const resolved = this.findAreaDefinitionForRuntime(areaId);
+    const override = resolved?.area;
     const candidates = [
+      resolved?.key,
       override?.bindKey,
+      override?.id,
       override?.virtualId,
       override?.displayName,
-      ...(Array.isArray(override?.aliases) ? override?.aliases || [] : [])
+      ...(Array.isArray(override?.aliases) ? override.aliases : [])
     ]
       .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
       .map((value) => norm(value));
@@ -4424,6 +4682,17 @@ export class Visual implements IVisual {
       if (row) return row;
     }
     return undefined;
+  }
+
+  private warnDrillRouteDiagnostic(message: string, data?: Record<string, unknown>): void {
+    const key = `${message}:${JSON.stringify(data || {})}`;
+    if (this.drillRouteDiagnosticKeys.has(key)) return;
+    this.drillRouteDiagnosticKeys.add(key);
+    try {
+      console.warn(`[Sigfarm Drill] ${message}`, data || {});
+    } catch {
+      // ignore diagnostic failures
+    }
   }
 
   private persistMapRegistryManifest(manifestJson: string): void {
@@ -4661,8 +4930,10 @@ export class Visual implements IVisual {
 
   private renderAdvancedEditor(options?: VisualUpdateOptions, dv?: DataView): void {
     if (!this.editorHost) return;
-    const showEditor = this.settings.editor.enabled && !this.canUseModalEditor() && (this.isAdvancedEditMode(options) || this.editorOpen);
-    if (!this.settings.editor.enabled) this.editorOpen = false;
+    const canExpose = this.canExposeEditorUi(options);
+    if (!canExpose) this.editorOpen = false;
+    const showEditor =
+      canExpose && !this.canUseModalEditor(options) && (this.isAdvancedEditMode(options) || this.editorOpen);
     this.editorHost.style.display = showEditor ? "block" : "none";
     this.editorHost.setAttribute("aria-hidden", showEditor ? "false" : "true");
     if (!showEditor) {
@@ -5330,24 +5601,14 @@ export class Visual implements IVisual {
     return layout;
   }
 
+  private getMapRegistryValidationIssues(manifest: MapRegistryManifest): ValidationIssue[] {
+    return validateMapRegistryManifestIssues(manifest);
+  }
+
   private validateMapRegistryManifest(manifest: MapRegistryManifest): string[] {
-    const errors: string[] = [];
-    const seen = new Set<string>();
-    for (const map of manifest.maps) {
-      if (seen.has(map.mapId)) errors.push(`mapId duplicado: ${map.mapId}`);
-      seen.add(map.mapId);
-      if (map.areas) {
-        const areaSeen = new Set<string>();
-        for (const [areaId, area] of Object.entries(map.areas)) {
-          const effectiveId = area.virtualId || area.id || areaId;
-          if (!effectiveId || !String(effectiveId).trim()) errors.push(`area com ID vazio em ${map.mapId}`);
-          const normalized = norm(effectiveId);
-          if (areaSeen.has(normalized)) errors.push(`area duplicada em ${map.mapId}: ${effectiveId}`);
-          areaSeen.add(normalized);
-        }
-      }
-    }
-    return errors;
+    return this.getMapRegistryValidationIssues(manifest)
+      .filter((issue) => issue.severity === "error")
+      .map((issue) => issue.message);
   }
 
   private getEditorWorkingState(): {
@@ -5578,6 +5839,27 @@ export class Visual implements IVisual {
     const panel = document.createElement("div");
     panel.className = "sp-editor-table";
     panel.appendChild(this.buildPanelTitle("Drill"));
+
+    const resolution = this.lastDrillResolutionTrace;
+    const summary = document.createElement("div");
+    summary.className = "sp-editor-status";
+    const currentPath = this.currentDrillPath.length > 0 ? this.currentDrillPath.join(" > ") : "(raiz)";
+    summary.textContent = `Contexto atual: ${currentPath}. Mapa resolvido: ${resolution?.mapId || this.activeMap.mapId || "nenhum"} (${resolution?.reason || "none"}).`;
+    panel.appendChild(summary);
+
+    if (resolution?.warnings?.length) {
+      const warnings = document.createElement("div");
+      warnings.className = "sp-editor-status is-error";
+      warnings.textContent = resolution.warnings.join(" | ");
+      panel.appendChild(warnings);
+    }
+
+    const hint = document.createElement("p");
+    hint.className = "sp-editor-area-item-meta";
+    hint.textContent =
+      "Fallback simplificado: edite nivel e drill path aqui. A associacao visual por area esta disponivel no modal quando o host permite dialogos.";
+    panel.appendChild(hint);
+
     const table = document.createElement("table");
     table.appendChild(this.createEditorHeader(["Map ID", "Nivel", "Drill path"]));
     const tbody = document.createElement("tbody");
@@ -5829,6 +6111,7 @@ export class Visual implements IVisual {
   public update(options: VisualUpdateOptions) {
     const eventService = (this.host as any)?.eventService as IVisualEventService | undefined;
     eventService?.renderingStarted(options);
+    this.lastUpdateOptions = options;
 
     let succeeded = false;
     try {
@@ -5843,6 +6126,7 @@ export class Visual implements IVisual {
       const previousActiveMapLevel = Number(this.activeMap.map?.level);
       const hadRenderableSvg = !!(this.svgRoot && this.zoomRoot);
       this.activeMap = this.resolveActiveMapFromDrillPath(this.settings.svgSettings.svgText, dv);
+      this.updateHostDrillState(dv);
       this.buildDataMap(dv);
       this.formattingSettingsModel.area.applyAreaFormattingVisibility(
         this.settings.area.colorMode,
@@ -5868,7 +6152,7 @@ export class Visual implements IVisual {
       }
 
       this.setUploadUIVisibility(hasSvg);
-      this.setEditorButtonVisibility(hasSvg);
+      this.setEditorButtonVisibility(hasSvg, options);
 
       const warningShow = !!this.settings?.warning?.show;
       this.warningForceShow = false;
@@ -5949,7 +6233,6 @@ export class Visual implements IVisual {
         properties: {
           svgText: this.settings.svgSettings.svgText,
           defaultFill: { solid: { color: this.settings.svgSettings.defaultFill } },
-          alwaysShowWarning: this.settings.svgSettings.alwaysShowWarning,
           labelShow: this.settings.svgSettings.labelShow,
           labelMin: this.settings.svgSettings.labelMin,
           labelMax: this.settings.svgSettings.labelMax,
@@ -5977,16 +6260,6 @@ export class Visual implements IVisual {
         selector: null as any,
         properties: {
           show: this.settings.help.show
-        }
-      } as any);
-    }
-
-    if (options.objectName === "warning") {
-      instances.push({
-        objectName: "warning",
-        selector: null as any,
-        properties: {
-          show: this.settings.warning.show
         }
       } as any);
     }
@@ -6054,12 +6327,15 @@ export class Visual implements IVisual {
   }
 
   private resolveRowFillColor(
-    row: Pick<CatRow, "value" | "themeColor" | "nativeFill">,
+    row: Pick<CatRow, "value" | "themeColor" | "nativeFill" | "rawKey" | "legendRawKey" | "colorKey">,
     matchedFill: string,
     stats: GradientStats,
     nativeFallbackFill?: string | null
   ): string {
-    const mode = this.settings.area.colorMode === "Gradient" ? "Gradient" : "Solid";
+    const mode = this.settings.area.colorMode;
+    if (this.settings.area.colorMode === "Theme") {
+      return this.getPowerBIThemeColor(row, row.rawKey, row.themeColor || matchedFill);
+    }
     if (mode === "Gradient") return this.resolveGradientFillColor(row.value, matchedFill, stats);
     return row.nativeFill || nativeFallbackFill || matchedFill;
   }

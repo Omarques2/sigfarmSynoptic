@@ -32,6 +32,14 @@ assert(/storageService/.test(visualTs), "visual.ts deve usar storageService do h
 assert(/addEventListener\(\s*"keydown"/.test(visualTs), "visual.ts deve ter suporte de teclado para interacao.");
 assert(/setAttribute\(\s*"tabindex"\s*,\s*"0"\s*\)/.test(visualTs), "visual.ts deve expor elementos focaveis via teclado.");
 assert(/isHighContrast/.test(visualTs), "visual.ts deve tratar modo de alto contraste.");
+assert(/sanitizeSvgDocument/.test(visualTs), "visual.ts deve manter sanitizacao SVG.");
+assert(/sanitizeSvgElement/.test(visualTs), "visual.ts deve manter sanitizacao de elementos SVG.");
+assert(/removedTags/.test(visualTs) && /removedAttrs/.test(visualTs), "SanitizationReport deve seguir rastreando remocoes.");
+assert(!/Aviso: SVG sanitizado/.test(visualTs), "visual.ts nao deve mostrar aviso de SVG sanitizado.");
+assert(!/Warning: SVG sanitized/.test(visualTs), "visual.ts nao deve mostrar warning de SVG sanitized.");
+assert(!/svgWarning\.style\.display\s*=\s*"block"/.test(visualTs), "warning de sanitizacao nao deve ser exibido.");
+assert(!/warning appears/.test(visualTs), "ajuda nao deve prometer warning visual de sanitizacao.");
+assert(!/Quando algo inseguro e removido, um aviso aparece/.test(visualTs), "ajuda nao deve prometer aviso visual de sanitizacao.");
 
 const pbiviz = JSON.parse(fs.readFileSync("pbiviz.json", "utf8"));
 assert.deepEqual(pbiviz.externalJS, [], "pbiviz.json deve manter externalJS vazio.");
