@@ -1,7 +1,6 @@
 {
   "dataRoles": [
     { "displayName": "Região (ID do SVG)", "name": "category", "kind": "Grouping" },
-    { "displayName": "Cor (tema)", "name": "colorBy", "kind": "Grouping" },
     { "displayName": "Legenda", "name": "legend", "kind": "Grouping" },
     { "displayName": "Valor", "name": "measure", "kind": "Measure" },
     { "displayName": "Tooltips", "name": "tooltips", "kind": "Measure" }
@@ -12,7 +11,6 @@
         "categories": {
           "select": [
             { "for": { "in": "category" } },
-            { "for": { "in": "colorBy" } },
             { "for": { "in": "legend" } }
           ],
           "dataReductionAlgorithm": { "top": {} }
@@ -28,7 +26,7 @@
   ],
   "objects": {
     "area": {
-      "displayName": "Area",
+      "displayName": "Mapa",
       "properties": {
         "colorMode": {
           "displayName": "Modo de cor",
@@ -36,7 +34,7 @@
             "enumeration": [
               { "displayName": "Tema do Power BI", "value": "Theme" },
               { "displayName": "Cor simples", "value": "Solid" },
-              { "displayName": "Gradiente", "value": "Gradient" }
+              { "displayName": "Gradiente por valor", "value": "Gradient" }
             ]
           }
         },
@@ -144,10 +142,10 @@
           }
         },
         "calloutCurveSize": { "displayName": "Tamanho da curva", "type": { "numeric": true } },
-        "calloutAllowRight": { "displayName": "Permitir direita", "type": { "bool": true } },
-        "calloutAllowLeft": { "displayName": "Permitir esquerda", "type": { "bool": true } },
-        "calloutAllowTop": { "displayName": "Permitir superior", "type": { "bool": true } },
-        "calloutAllowBottom": { "displayName": "Permitir inferior", "type": { "bool": true } }
+        "calloutAllowRight": { "displayName": "Direita", "type": { "bool": true } },
+        "calloutAllowLeft": { "displayName": "Esquerda", "type": { "bool": true } },
+        "calloutAllowTop": { "displayName": "Cima", "type": { "bool": true } },
+        "calloutAllowBottom": { "displayName": "Baixo", "type": { "bool": true } }
       }
     },
     "mapRegistry": {

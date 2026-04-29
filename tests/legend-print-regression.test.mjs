@@ -4,6 +4,21 @@ import assert from "node:assert/strict";
 const visualTs = fs.readFileSync("src/visual.ts", "utf8");
 
 assert(
+  /row\.fillColor \|\| this\.settings\.area\.matchedFill/.test(visualTs),
+  "Legenda deve usar row.fillColor como swatch."
+);
+
+assert(
+  /legendRawKey = legendRaw\.trim\(\) \|\| rawKey/.test(visualTs),
+  "buildDataMap deve preencher legendRawKey com fallback para rawKey."
+);
+
+assert(
+  /const colorKey = legendRawKey \|\| rawKey/.test(visualTs),
+  "colorKey deve usar legenda ou regiao, sem colorBy."
+);
+
+assert(
   /const\s+swatchColor\s*=/.test(visualTs),
   "visual.ts deve centralizar a cor da legenda em swatchColor."
 );

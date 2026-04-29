@@ -15,6 +15,12 @@ assert(fs.existsSync("SECURITY.md"), "SECURITY.md deve existir na raiz do projet
 
 const capabilities = JSON.parse(fs.readFileSync("capabilities.json", "utf8"));
 assert.equal(capabilities.supportsKeyboardFocus, true, "capabilities.json deve habilitar supportsKeyboardFocus.");
+const roleNames = Array.isArray(capabilities.dataRoles) ? capabilities.dataRoles.map((role) => role?.name) : [];
+assert(roleNames.includes("category"), "capabilities.json deve expor o dataRole 'category'.");
+assert(roleNames.includes("legend"), "capabilities.json deve expor o dataRole 'legend'.");
+assert(roleNames.includes("measure"), "capabilities.json deve expor o dataRole 'measure'.");
+assert(roleNames.includes("tooltips"), "capabilities.json deve expor o dataRole 'tooltips'.");
+assert(!roleNames.includes("colorBy"), "capabilities.json nao deve expor o dataRole 'colorBy'.");
 assert(
   Array.isArray(capabilities.privileges) &&
     capabilities.privileges.some((p) => p?.name === "LocalStorage"),
@@ -24,6 +30,11 @@ assert(
   Array.isArray(capabilities.privileges) &&
     !capabilities.privileges.some((p) => p?.name === "WebAccess"),
   "capabilities.json nao deve declarar o privilegio WebAccess."
+);
+assert(
+  Array.isArray(capabilities.privileges) &&
+    !capabilities.privileges.some((p) => p?.name === "ExportContent"),
+  "capabilities.json nao deve declarar o privilegio ExportContent."
 );
 
 const visualTs = fs.readFileSync("src/visual.ts", "utf8");

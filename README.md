@@ -17,7 +17,7 @@ Custom visual for Power BI that renders SVG synoptic panels with:
 ## Color Modes
 
 The visual supports three area color modes in the format pane:
-- `Theme`: uses the current Power BI theme palette by category/area. This is the default so the visual follows the report theme and other visuals.
+- `Theme`: uses the current Power BI theme palette. When `Legenda` is filled, it is used as the preferred theme color key; otherwise the visual uses the region/area key. This is the default so the visual follows the report theme and other visuals.
 - `Solid`: applies "Cor das areas" to matched areas. This picker exposes the native Power BI `fx` button, so rules, gradients and field-value/DAX conditional colors can resolve per area.
 - `Gradient`: uses the current measure to interpolate a three-color continuous scale from low to mid to high.
 
@@ -36,6 +36,16 @@ Native conditional formatting behavior:
 - Unmatched areas still use `unmatchedFill`.
 - Matched areas first use the color resolved by Power BI for that area.
 - If Power BI doesn't resolve a color for a matched area, the visual falls back to `matchedFill`.
+
+## Data Roles
+
+`Adicionar dados ao seu visual` should be configured with:
+- `Região (ID do SVG)`: required
+- `Legenda`: optional, used by the legend and as the preferred theme color key
+- `Valor`: optional, used for values, gradients and primary numeric labels
+- `Tooltips`: optional
+
+There is no separate color bucket. Theme colors come from the Power BI theme plus `Legenda` or `Região`.
 
 ## Interaction and Labels
 

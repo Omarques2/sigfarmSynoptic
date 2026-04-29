@@ -35,6 +35,11 @@ function getBool(root: unknown, path: string[], def: boolean): boolean {
   return typeof v === "boolean" ? v : def;
 }
 
+function hasObjectProperty(root: unknown, objectName: string, propertyName: string): boolean {
+  const obj = isObj(root) ? (root as Obj)[objectName] : undefined;
+  return isObj(obj) && Object.prototype.hasOwnProperty.call(obj, propertyName);
+}
+
 function getFill(root: unknown, objectName: string, prop: string, def: string): string {
   const v1 = getPath(root, [objectName, prop, "solid", "color"]);
   if (typeof v1 === "string") return v1;
@@ -99,6 +104,60 @@ function normalizeLabelScaleMode(mode: string | undefined | null): string {
 function normalizeLabelDenseMode(mode: string | undefined | null): string {
   const allowed = new Set(["All", "DataOnly", "SelectedOnly", "Hidden"]);
   return mode && allowed.has(mode) ? mode : "DataOnly";
+}
+
+function applyLegacyCalloutSideModeToAllowedSides(settings: LabelsSettings, objects: unknown): void {
+  const hasExplicitAllowedSide =
+    hasObjectProperty(objects, "labels", "calloutAllowRight") ||
+    hasObjectProperty(objects, "labels", "calloutAllowLeft") ||
+    hasObjectProperty(objects, "labels", "calloutAllowTop") ||
+    hasObjectProperty(objects, "labels", "calloutAllowBottom");
+
+  if (hasExplicitAllowedSide) {
+    settings.calloutSideMode = "CustomSides";
+    return;
+  }
+
+  const mode = settings.calloutSideMode;
+
+  if (mode === "Right") {
+    settings.calloutAllowRight = true;
+    settings.calloutAllowLeft = false;
+    settings.calloutAllowTop = false;
+    settings.calloutAllowBottom = false;
+  } else if (mode === "Left") {
+    settings.calloutAllowRight = false;
+    settings.calloutAllowLeft = true;
+    settings.calloutAllowTop = false;
+    settings.calloutAllowBottom = false;
+  } else if (mode === "Top") {
+    settings.calloutAllowRight = false;
+    settings.calloutAllowLeft = false;
+    settings.calloutAllowTop = true;
+    settings.calloutAllowBottom = false;
+  } else if (mode === "Bottom") {
+    settings.calloutAllowRight = false;
+    settings.calloutAllowLeft = false;
+    settings.calloutAllowTop = false;
+    settings.calloutAllowBottom = true;
+  } else if (mode === "HorizontalNearest") {
+    settings.calloutAllowRight = true;
+    settings.calloutAllowLeft = true;
+    settings.calloutAllowTop = false;
+    settings.calloutAllowBottom = false;
+  } else if (mode === "VerticalNearest") {
+    settings.calloutAllowRight = false;
+    settings.calloutAllowLeft = false;
+    settings.calloutAllowTop = true;
+    settings.calloutAllowBottom = true;
+  } else if (mode === "Nearest") {
+    settings.calloutAllowRight = true;
+    settings.calloutAllowLeft = true;
+    settings.calloutAllowTop = true;
+    settings.calloutAllowBottom = true;
+  }
+
+  settings.calloutSideMode = "CustomSides";
 }
 
 export class AreaSettings {
@@ -357,6 +416,7 @@ export class VisualSettings {
     s.labels.calloutAllowLeft = getBool(objects, ["labels", "calloutAllowLeft"], s.labels.calloutAllowLeft);
     s.labels.calloutAllowTop = getBool(objects, ["labels", "calloutAllowTop"], s.labels.calloutAllowTop);
     s.labels.calloutAllowBottom = getBool(objects, ["labels", "calloutAllowBottom"], s.labels.calloutAllowBottom);
+    applyLegacyCalloutSideModeToAllowedSides(s.labels, objects);
 
     // Map registry/editor/drill/label overrides
     s.mapRegistry.manifestJson = getString(objects, ["mapRegistry", "manifestJson"], s.mapRegistry.manifestJson);
@@ -464,7 +524,7 @@ class ObjectBoundColorPicker extends formattingSettings.ColorPicker {
 
 export class AreaFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "area";
-  public displayName: string = "Cores das areas";
+  public displayName: string = "Mapa";
 
   public colorMode = new formattingSettings.ItemDropdown({
     name: "colorMode",
@@ -472,7 +532,7 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
     items: [
       { value: "Theme", displayName: "Tema do Power BI" },
       { value: "Solid", displayName: "Cor simples" },
-      { value: "Gradient", displayName: "Gradiente" }
+      { value: "Gradient", displayName: "Gradiente por valor" }
     ],
     value: { value: "Theme", displayName: "Tema do Power BI" }
   });
@@ -532,7 +592,7 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
     this.matchedFill.value = { value: currentSimpleFill };
     this.colorMode.value =
       mode === "Gradient"
-        ? { value: "Gradient", displayName: "Gradiente" }
+        ? { value: "Gradient", displayName: "Gradiente por valor" }
         : mode === "Solid"
           ? { value: "Solid", displayName: "Cor simples" }
           : { value: "Theme", displayName: "Tema do Power BI" };
@@ -541,7 +601,7 @@ export class AreaFormattingCard extends formattingSettings.SimpleCard {
 
 export class SvgFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "svgSettings";
-  public displayName: string = "SVG e rotulos";
+  public displayName: string = "Rótulos";
 
   public svgText = new formattingSettings.TextArea({
     name: "svgText",
@@ -565,19 +625,19 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
 
   public labelShow = new formattingSettings.ToggleSwitch({
     name: "labelShow",
-    displayName: "Mostrar rotulos (valor)",
+    displayName: "Mostrar rótulos",
     value: true
   });
 
   public labelMin = new formattingSettings.NumUpDown({
     name: "labelMin",
-    displayName: "Tamanho minimo (px)",
+    displayName: "Tamanho mínimo",
     value: 9
   });
 
   public labelMax = new formattingSettings.NumUpDown({
     name: "labelMax",
-    displayName: "Tamanho maximo (px)",
+    displayName: "Tamanho máximo",
     value: 26
   });
 
@@ -595,7 +655,7 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
 
   public labelScaleMode = new formattingSettings.ItemDropdown({
     name: "labelScaleMode",
-    displayName: "Escala do rotulo",
+    displayName: "Escala do texto",
     items: [
       { value: "FixedScreenSize", displayName: "Tamanho fixo na tela" },
       { value: "ScaleWithMap", displayName: "Escalar com o mapa" }
@@ -605,25 +665,25 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
 
   public labelMinScreenPx = new formattingSettings.NumUpDown({
     name: "labelMinScreenPx",
-    displayName: "Minimo na tela (px)",
+    displayName: "Mín. na tela",
     value: 8
   });
 
   public labelMaxScreenPx = new formattingSettings.NumUpDown({
     name: "labelMaxScreenPx",
-    displayName: "Maximo na tela (px)",
+    displayName: "Máx. na tela",
     value: 22
   });
 
   public labelHideBelowAreaPx = new formattingSettings.NumUpDown({
     name: "labelHideBelowAreaPx",
-    displayName: "Ocultar se area menor que (px)",
+    displayName: "Ocultar em áreas pequenas",
     value: 0
   });
 
   public labelDenseMode = new formattingSettings.ItemDropdown({
     name: "labelDenseMode",
-    displayName: "Rotulos em mapas densos",
+    displayName: "Modo em mapas densos",
     items: [
       { value: "DataOnly", displayName: "Somente com dados" },
       { value: "SelectedOnly", displayName: "Somente selecionadas" },
@@ -634,8 +694,6 @@ export class SvgFormattingCard extends formattingSettings.SimpleCard {
   });
 
   public slices = [
-    this.svgText,
-    this.defaultFill,
     this.labelShow,
     this.labelMin,
     this.labelMax,
@@ -655,7 +713,7 @@ export class OutlineFormattingCard extends formattingSettings.SimpleCard {
 
   public show = new formattingSettings.ToggleSwitch({
     name: "show",
-    displayName: "Mostrar",
+    displayName: "Mostrar contorno",
     value: false
   });
 
@@ -667,7 +725,7 @@ export class OutlineFormattingCard extends formattingSettings.SimpleCard {
 
   public width = new formattingSettings.NumUpDown({
     name: "width",
-    displayName: "Espessura (px)",
+    displayName: "Espessura",
     value: 1
   });
 
@@ -680,7 +738,7 @@ export class LegendFormattingCard extends formattingSettings.SimpleCard {
 
   public show = new formattingSettings.ToggleSwitch({
     name: "show",
-    displayName: "Mostrar",
+    displayName: "Mostrar legenda",
     value: false
   });
 
@@ -711,7 +769,7 @@ export class LegendFormattingCard extends formattingSettings.SimpleCard {
 
   public fontSize = new formattingSettings.NumUpDown({
     name: "fontSize",
-    displayName: "Tamanho do texto (px)",
+    displayName: "Tamanho da fonte",
     value: 12
   });
 
@@ -764,41 +822,41 @@ export class UiFormattingCard extends formattingSettings.SimpleCard {
 
 export class InteractionFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "interaction";
-  public displayName: string = "Interacao";
+  public displayName: string = "Interação";
 
   public autoFocusSelectedArea = new formattingSettings.ToggleSwitch({
     name: "autoFocusSelectedArea",
-    displayName: "Focar area selecionada",
+    displayName: "Focar área selecionada",
     value: true
   });
 
   public focusExternalSelection = new formattingSettings.ToggleSwitch({
     name: "focusExternalSelection",
-    displayName: "Focar selecao externa",
+    displayName: "Focar seleção externa",
     value: false
   });
 
   public focusPadding = new formattingSettings.NumUpDown({
     name: "focusPadding",
-    displayName: "Padding do foco (%)",
+    displayName: "Margem do foco",
     value: 12
   });
 
   public focusAnimationMs = new formattingSettings.NumUpDown({
     name: "focusAnimationMs",
-    displayName: "Animacao do foco (ms)",
+    displayName: "Duração da animação",
     value: 260
   });
 
   public unselectedOpacity = new formattingSettings.NumUpDown({
     name: "unselectedOpacity",
-    displayName: "Opacidade das areas nao selecionadas",
+    displayName: "Opacidade não selecionadas",
     value: 0.18
   });
 
   public labelUnselectedOpacity = new formattingSettings.NumUpDown({
     name: "labelUnselectedOpacity",
-    displayName: "Opacidade dos rotulos nao selecionados",
+    displayName: "Opacidade dos rótulos não selecionados",
     value: 0.35
   });
 
@@ -814,11 +872,11 @@ export class InteractionFormattingCard extends formattingSettings.SimpleCard {
 
 export class LabelsFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "labels";
-  public displayName: string = "Rotulos avancados";
+  public displayName: string = "Rótulos externos";
 
   public labelMode = new formattingSettings.ItemDropdown({
     name: "labelMode",
-    displayName: "Modo dos rotulos",
+    displayName: "Posição do rótulo",
     items: [
       { value: "Inside", displayName: "Interno" },
       { value: "OutsideCallout", displayName: "Callout externo" }
@@ -828,7 +886,7 @@ export class LabelsFormattingCard extends formattingSettings.SimpleCard {
 
   public labelContent = new formattingSettings.ItemDropdown({
     name: "labelContent",
-    displayName: "Conteudo",
+    displayName: "Conteúdo",
     items: [
       { value: "Value", displayName: "Valor" },
       { value: "Category", displayName: "Categoria" },
@@ -850,7 +908,7 @@ export class LabelsFormattingCard extends formattingSettings.SimpleCard {
 
   public calloutDistance = new formattingSettings.NumUpDown({
     name: "calloutDistance",
-    displayName: "Distancia do callout",
+    displayName: "Distância",
     value: 36
   });
 
@@ -912,40 +970,36 @@ export class LabelsFormattingCard extends formattingSettings.SimpleCard {
 
   public calloutAllowRight = new formattingSettings.ToggleSwitch({
     name: "calloutAllowRight",
-    displayName: "Permitir direita",
+    displayName: "Direita",
     value: true
   });
 
   public calloutAllowLeft = new formattingSettings.ToggleSwitch({
     name: "calloutAllowLeft",
-    displayName: "Permitir esquerda",
+    displayName: "Esquerda",
     value: true
   });
 
   public calloutAllowTop = new formattingSettings.ToggleSwitch({
     name: "calloutAllowTop",
-    displayName: "Permitir superior",
+    displayName: "Cima",
     value: false
   });
 
   public calloutAllowBottom = new formattingSettings.ToggleSwitch({
     name: "calloutAllowBottom",
-    displayName: "Permitir inferior",
+    displayName: "Baixo",
     value: false
   });
 
   public slices = [
     this.labelMode,
     this.labelContent,
-    this.calloutTextAlign,
     this.calloutDistance,
     this.calloutLineColor,
     this.calloutTextColor,
     this.calloutLineWidth,
-    this.calloutMinGap,
-    this.calloutSideMode,
     this.calloutRouteStyle,
-    this.calloutCurveSize,
     this.calloutAllowRight,
     this.calloutAllowLeft,
     this.calloutAllowTop,
@@ -970,7 +1024,7 @@ export class MapRegistryFormattingCard extends formattingSettings.SimpleCard {
 
 export class EditorFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "editor";
-  public displayName: string = "Editor avancado";
+  public displayName: string = "Editor de mapas";
 
   public enabled = new formattingSettings.ToggleSwitch({
     name: "enabled",
@@ -980,7 +1034,7 @@ export class EditorFormattingCard extends formattingSettings.SimpleCard {
 
   public showEditorButton = new formattingSettings.ToggleSwitch({
     name: "showEditorButton",
-    displayName: "Mostrar botao Editor",
+    displayName: "Mostrar botão do editor",
     value: true
   });
 
@@ -990,16 +1044,16 @@ export class EditorFormattingCard extends formattingSettings.SimpleCard {
     value: true
   });
 
-  public slices = [this.enabled, this.showEditorButton, this.showManifestEditor];
+  public slices = [this.showEditorButton];
 }
 
 export class DrillMapsFormattingCard extends formattingSettings.SimpleCard {
   public name: string = "drillMaps";
-  public displayName: string = "Drill de mapas";
+  public displayName: string = "Drill Path";
 
   public enabled = new formattingSettings.ToggleSwitch({
     name: "enabled",
-    displayName: "Habilitar mapas por drill",
+    displayName: "Ativar Drill Path",
     value: true
   });
 
@@ -1011,7 +1065,7 @@ export class DrillMapsFormattingCard extends formattingSettings.SimpleCard {
 
   public noDataBehavior = new formattingSettings.ItemDropdown({
     name: "noDataBehavior",
-    displayName: "Areas sem dado no drill",
+    displayName: "Áreas sem dados",
     items: [
       { value: "Fade", displayName: "Desvanecer" },
       { value: "Hide", displayName: "Ocultar" }
@@ -1021,7 +1075,7 @@ export class DrillMapsFormattingCard extends formattingSettings.SimpleCard {
 
   public focusDataAreas = new formattingSettings.ToggleSwitch({
     name: "focusDataAreas",
-    displayName: "Focar areas com dado",
+    displayName: "Focar áreas com dados",
     value: true
   });
 
@@ -1077,20 +1131,7 @@ export class DrillMapsFormattingCard extends formattingSettings.SimpleCard {
     value: 24
   });
 
-  public slices = [
-    this.enabled,
-    this.fallbackToDefaultMap,
-    this.noDataBehavior,
-    this.focusDataAreas,
-    this.preFocusSourceOnDrill,
-    this.normalizeDrillFocus,
-    this.drillRenderScopeMode,
-    this.drillMinFocusScale,
-    this.drillFocusPaddingPct,
-    this.drillTargetAreaScreenPx,
-    this.drillAreaScalePercentile,
-    this.drillMaxFocusScale
-  ];
+  public slices = [this.enabled, this.noDataBehavior, this.focusDataAreas];
 }
 
 export class LabelOverridesFormattingCard extends formattingSettings.SimpleCard {
@@ -1145,17 +1186,12 @@ export class VisualFormattingSettingsModel extends formattingSettings.Model {
 
   public cards = [
     this.area,
+    this.outline,
     this.svgSettings,
     this.labels,
-    this.interaction,
-    this.outline,
     this.legend,
-    this.mapRegistry,
-    this.editor,
+    this.interaction,
     this.drillMaps,
-    this.labelOverrides,
-    this.performance,
-    this.help,
-    this.ui
+    this.editor
   ];
 }

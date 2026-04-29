@@ -1344,28 +1344,10 @@ function resolveCalloutSide(
     return overrideSide;
   }
 
-  const mode = cfg.calloutSideMode;
-  if (mode === "Left") return "left";
-  if (mode === "Top") return "top";
-  if (mode === "Bottom") return "bottom";
-  if (mode === "HorizontalNearest") {
-    return sideDistance("left", anchorX, anchorY, mapBBox) < sideDistance("right", anchorX, anchorY, mapBBox)
-      ? "left"
-      : "right";
-  }
-  if (mode === "VerticalNearest") {
-    return sideDistance("top", anchorX, anchorY, mapBBox) < sideDistance("bottom", anchorX, anchorY, mapBBox)
-      ? "top"
-      : "bottom";
-  }
-
-  const candidates = mode === "CustomSides" ? getAllowedCalloutSides(cfg) : (["right", "left", "top", "bottom"] as CalloutSide[]);
-  if (mode === "Nearest" || mode === "CustomSides") {
-    return candidates.reduce((best, side) =>
-      sideDistance(side, anchorX, anchorY, mapBBox) < sideDistance(best, anchorX, anchorY, mapBBox) ? side : best
-    );
-  }
-  return "right";
+  const candidates = getAllowedCalloutSides(cfg);
+  return candidates.reduce((best, side) =>
+    sideDistance(side, anchorX, anchorY, mapBBox) < sideDistance(best, anchorX, anchorY, mapBBox) ? side : best
+  );
 }
 
 function computeCalloutLayout(
@@ -3307,33 +3289,37 @@ export class Visual implements IVisual {
     return host;
   }
 
+  private hideLegend(): void {
+    this.legendHost.style.display = "none";
+    this.legendHost.textContent = "";
+    this.contentHost.style.flexDirection = "column";
+    this.contentHost.style.gap = "0";
+    this.legendHost.style.width = "";
+    this.legendHost.style.height = "";
+    this.legendHost.style.maxWidth = "";
+    this.legendHost.style.maxHeight = "";
+    this.legendHost.style.order = "1";
+    this.svgHost.style.order = "0";
+  }
+
+  private getLegendLabelForRow(row: CatRow): string {
+    const label = String(row.legendRawKey || "").trim();
+    if (label) return label;
+    const raw = String(row.rawKey || "").trim();
+    if (raw) return raw;
+    const key = String(row.key || "").trim();
+    return key || "(sem legenda)";
+  }
+
+  private getLegendGroupKeyForRow(row: CatRow): string {
+    return legendGroupKey(this.getLegendLabelForRow(row));
+  }
+
   private updateLegend(dv?: DataView, hasSvg?: boolean) {
     const legend = this.settings.legend;
-    if (this.settings.area.colorMode === "Gradient") {
-      this.legendHost.style.display = "none";
-      this.legendHost.textContent = "";
-      this.contentHost.style.flexDirection = "column";
-      this.contentHost.style.gap = "0";
-      this.legendHost.style.width = "";
-      this.legendHost.style.height = "";
-      this.legendHost.style.maxWidth = "";
-      this.legendHost.style.maxHeight = "";
-      this.legendHost.style.order = "1";
-      this.svgHost.style.order = "0";
-      return;
-    }
-
-    if (!legend?.show || !dv || !hasSvg || this.dataMap.size === 0) {
-      this.legendHost.style.display = "none";
-      this.legendHost.textContent = "";
-      this.contentHost.style.flexDirection = "column";
-      this.contentHost.style.gap = "0";
-      this.legendHost.style.width = "";
-      this.legendHost.style.height = "";
-      this.legendHost.style.maxWidth = "";
-      this.legendHost.style.maxHeight = "";
-      this.legendHost.style.order = "1";
-      this.svgHost.style.order = "0";
+    void dv;
+    if (!legend?.show || !hasSvg || this.dataMap.size === 0) {
+      this.hideLegend();
       return;
     }
 
@@ -3369,7 +3355,7 @@ export class Visual implements IVisual {
     const legendRowsByKey = new Map<string, CatRow[]>();
     const uniqueLegendRows = new Map<string, CatRow>();
     for (const row of this.dataMap.values()) {
-      const legendKey = legendGroupKey(row.legendRawKey);
+      const legendKey = this.getLegendGroupKeyForRow(row);
       if (!legendRowsByKey.has(legendKey)) legendRowsByKey.set(legendKey, []);
       legendRowsByKey.get(legendKey)?.push(row);
       if (!uniqueLegendRows.has(legendKey)) {
@@ -3378,15 +3364,16 @@ export class Visual implements IVisual {
     }
 
     for (const row of uniqueLegendRows.values()) {
-      const legendKey = legendGroupKey(row.legendRawKey);
+      const legendKey = this.getLegendGroupKeyForRow(row);
       const rowsForLegend = legendRowsByKey.get(legendKey) || [row];
       const contextRow = rowsForLegend[0] || row;
+      const legendLabel = this.getLegendLabelForRow(row);
 
       const item = document.createElement("div");
       item.setAttribute("data-sp-legend-group", legendKey);
       item.setAttribute("role", "button");
       item.setAttribute("tabindex", "0");
-      item.setAttribute("aria-label", `Legenda: ${row.legendRawKey}`);
+      item.setAttribute("aria-label", `Legenda: ${legendLabel}`);
       Object.assign(item.style, {
         display: "flex",
         alignItems: "center",
@@ -3396,7 +3383,8 @@ export class Visual implements IVisual {
         userSelect: "none"
       } as CSSStyleDeclaration);
 
-      const swatchColor = inHighContrast && hcPalette ? hcPalette.foreground : row.fillColor || this.settings.area.matchedFill;
+      const swatchColor =
+        inHighContrast && hcPalette ? hcPalette.foreground : row.fillColor || this.settings.area.matchedFill;
       const swatch = document.createElement("span");
       Object.assign(swatch.style, {
         width: "10px",
@@ -3410,7 +3398,7 @@ export class Visual implements IVisual {
       swatch.style.setProperty("print-color-adjust", "exact");
 
       const label = document.createElement("span");
-      label.textContent = row.legendRawKey;
+      label.textContent = legendLabel;
       Object.assign(label.style, {
         fontSize: `${fontSize}px`,
         color: effectiveLabelColor,
@@ -6359,7 +6347,6 @@ export class Visual implements IVisual {
       .map((column) => this.getCategoryColumnName(column))
       .filter((name): name is string => !!name);
     this.activeCategoryQueryName = this.getCategoryColumnName(currentCategory);
-    const colorByCol = catCols.find((c) => c?.source?.roles?.colorBy);
     const legendCol = catCols.find((c) => c?.source?.roles?.legend);
 
     const values = cat?.values;
@@ -6380,10 +6367,9 @@ export class Visual implements IVisual {
     for (let i = 0; i < regionCol.values.length; i++) {
       const rawKey = String(regionCol.values[i] ?? "");
       const key = norm(rawKey);
-      const colorKeyRaw = colorByCol ? String(colorByCol.values[i] ?? "") : rawKey;
-      const colorKey = colorKeyRaw || rawKey;
-      const legendRaw = legendCol ? String(legendCol.values[i] ?? "") : rawKey;
-      const legendRawKey = legendRaw || rawKey;
+      const legendRaw = legendCol ? String(legendCol.values[i] ?? "") : "";
+      const legendRawKey = legendRaw.trim() || rawKey;
+      const colorKey = legendRawKey || rawKey;
       const nativeObjects = regionCol.objects?.[i];
 
       const measureValRaw = measureCol ? (measureCol.values[i] as any) : null;
@@ -7171,7 +7157,7 @@ export class Visual implements IVisual {
       for (const key of visualFocusKeys) {
         const row = this.dataMap.get(key);
         if (!row) continue;
-        selectedLegendGroups.add(legendGroupKey(row.legendRawKey));
+        selectedLegendGroups.add(this.getLegendGroupKeyForRow(row));
       }
 
       const legendItems = Array.from(this.legendHost.querySelectorAll<HTMLElement>("[data-sp-legend-group]"));

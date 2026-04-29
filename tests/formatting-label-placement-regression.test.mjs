@@ -2,6 +2,83 @@ import fs from "node:fs";
 import assert from "node:assert/strict";
 
 const settingsTs = fs.readFileSync("src/settings.ts", "utf8");
+const visualTs = fs.readFileSync("src/visual.ts", "utf8");
+const capabilities = JSON.parse(fs.readFileSync("capabilities.json", "utf8"));
+
+const publicCardsMatch = settingsTs.match(/public cards = \[([\s\S]*?)\];/);
+assert(publicCardsMatch, "VisualFormattingSettingsModel deve declarar public cards.");
+const publicCardsBlock = publicCardsMatch[1];
+
+assert(publicCardsBlock.includes("this.area"), "Painel deve expor card Mapa/area.");
+assert(publicCardsBlock.includes("this.outline"), "Painel deve expor card Contorno/outline.");
+assert(publicCardsBlock.includes("this.svgSettings"), "Painel deve expor card Rotulos/svgSettings.");
+assert(publicCardsBlock.includes("this.labels"), "Painel deve expor card Rotulos externos/labels.");
+assert(publicCardsBlock.includes("this.legend"), "Painel deve expor card Legenda.");
+assert(publicCardsBlock.includes("this.interaction"), "Painel deve expor card Interacao.");
+assert(publicCardsBlock.includes("this.drillMaps"), "Painel deve expor card Drill Path.");
+assert(publicCardsBlock.includes("this.editor"), "Painel deve expor card Editor de mapas.");
+
+assert(!publicCardsBlock.includes("this.mapRegistry"), "mapRegistry nao deve aparecer no painel publico.");
+assert(!publicCardsBlock.includes("this.labelOverrides"), "labelOverrides nao deve aparecer no painel publico.");
+assert(!publicCardsBlock.includes("this.performance"), "performance nao deve aparecer no painel publico.");
+assert(!publicCardsBlock.includes("this.help"), "help nao deve aparecer no painel publico.");
+assert(!publicCardsBlock.includes("this.warning"), "warning nao deve aparecer no painel publico.");
+assert(!publicCardsBlock.includes("this.ui"), "ui nao deve aparecer no painel publico.");
+
+const svgCardMatch = settingsTs.match(/class SvgFormattingCard[\s\S]*?public slices = \[([\s\S]*?)\];/);
+assert(svgCardMatch, "SvgFormattingCard deve declarar slices.");
+const svgSlices = svgCardMatch[1];
+
+assert(!svgSlices.includes("this.svgText"), "svgText nao deve aparecer no card publico de Rotulos.");
+assert(!svgSlices.includes("this.defaultFill"), "defaultFill legado nao deve aparecer no card publico de Rotulos.");
+assert(!svgSlices.includes("this.alwaysShowWarning"), "alwaysShowWarning nao deve aparecer no card publico de Rotulos.");
+
+assert(
+  /calloutAllowRight/.test(settingsTs) &&
+    /calloutAllowLeft/.test(settingsTs) &&
+    /calloutAllowTop/.test(settingsTs) &&
+    /calloutAllowBottom/.test(settingsTs),
+  "Rótulos externos devem manter toggles de direção."
+);
+
+const labelsCardMatch = settingsTs.match(/export class LabelsFormattingCard[\s\S]*?public slices = \[([\s\S]*?)\];/);
+assert(labelsCardMatch, "LabelsFormattingCard deve declarar slices.");
+const labelsSlices = labelsCardMatch[1];
+
+assert(labelsSlices.includes("this.calloutAllowRight"), "Rótulos externos deve expor direção Direita.");
+assert(labelsSlices.includes("this.calloutAllowLeft"), "Rótulos externos deve expor direção Esquerda.");
+assert(labelsSlices.includes("this.calloutAllowTop"), "Rótulos externos deve expor direção Cima.");
+assert(labelsSlices.includes("this.calloutAllowBottom"), "Rótulos externos deve expor direção Baixo.");
+assert(!labelsSlices.includes("this.calloutSideMode"), "calloutSideMode deve continuar oculto no painel público.");
+
+assert(
+  /class LabelsFormattingCard[\s\S]*?public slices = \[\s*this\.labelMode,\s*this\.labelContent,\s*this\.calloutDistance,\s*this\.calloutLineColor,\s*this\.calloutTextColor,\s*this\.calloutLineWidth,\s*this\.calloutRouteStyle,\s*this\.calloutAllowRight,\s*this\.calloutAllowLeft,\s*this\.calloutAllowTop,\s*this\.calloutAllowBottom\s*\];/s.test(
+    settingsTs
+  ),
+  "LabelsFormattingCard deve expor apenas slices publicos simplificados."
+);
+
+assert(/hasObjectProperty/.test(settingsTs), "Settings deve detectar propriedades persistidas para compatibilidade.");
+assert(
+  /applyLegacyCalloutSideModeToAllowedSides/.test(settingsTs),
+  "Settings deve migrar calloutSideMode legado para toggles."
+);
+
+const labelsProps = capabilities?.objects?.labels?.properties || {};
+assert(labelsProps.calloutAllowRight?.displayName === "Direita", "Schema deve expor calloutAllowRight como Direita.");
+assert(labelsProps.calloutAllowLeft?.displayName === "Esquerda", "Schema deve expor calloutAllowLeft como Esquerda.");
+assert(labelsProps.calloutAllowTop?.displayName === "Cima", "Schema deve expor calloutAllowTop como Cima.");
+assert(labelsProps.calloutAllowBottom?.displayName === "Baixo", "Schema deve expor calloutAllowBottom como Baixo.");
+
+assert(
+  /public slices = \[\s*this\.enabled,\s*this\.noDataBehavior,\s*this\.focusDataAreas\s*\]/.test(settingsTs),
+  "DrillMapsFormattingCard deve expor apenas enabled, noDataBehavior e focusDataAreas."
+);
+
+assert(
+  /class EditorFormattingCard[\s\S]*?public slices = \[\s*this\.showEditorButton\s*\];/s.test(settingsTs),
+  "EditorFormattingCard deve expor apenas showEditorButton."
+);
 
 assert(
   /applyAreaFormattingVisibility\s*\(\s*colorMode:\s*string\s*,\s*nativeFallbackFill:\s*string\s*\)/.test(settingsTs),
@@ -29,8 +106,6 @@ assert(
   /Tema do Power BI/.test(settingsTs) && /value:\s*"Theme"/.test(settingsTs),
   "Dropdown de cores deve expor Tema do Power BI."
 );
-
-const visualTs = fs.readFileSync("src/visual.ts", "utf8");
 
 assert(
   /this\.formattingSettingsModel\.area\.applyAreaFormattingVisibility\(\s*this\.settings\.area\.colorMode,\s*this\.settings\.area\.matchedFill\s*\);/.test(
