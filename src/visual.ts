@@ -4977,13 +4977,17 @@ export class Visual implements IVisual {
     const levelInput = shell.querySelector<HTMLInputElement>("[data-editor-browser-map-level='1']");
     const drillInput = shell.querySelector<HTMLInputElement>("[data-editor-browser-map-drill='1']");
     const defaultInput = shell.querySelector<HTMLInputElement>("[data-editor-browser-default='1']");
-    activeMap.name = nameInput?.value?.trim() || activeMap.name || activeMap.mapId;
+    if (nameInput) {
+      activeMap.name = nameInput.value.trim() || activeMap.name;
+    }
     const levelRaw = levelInput?.value?.trim?.() || "";
     activeMap.level = levelRaw === "" ? undefined : Number(levelRaw);
-    activeMap.drillPath = (drillInput?.value || "")
-      .split(">")
-      .map((value) => value.trim())
-      .filter((value) => !!value);
+    if (drillInput) {
+      activeMap.drillPath = drillInput.value
+        .split(">")
+        .map((value) => value.trim())
+        .filter((value) => !!value);
+    }
     if (defaultInput?.checked) manifest.defaultMapId = activeMap.mapId;
   }
 
@@ -5330,21 +5334,15 @@ export class Visual implements IVisual {
       if (map.mapId === workingState.activeMap.mapId) item.classList.add("is-active");
       item.setAttribute("data-editor-map-row", map.mapId);
 
+      const isRootMap = workingState.manifest.defaultMapId === map.mapId;
+      const displayName = (map.name || "").trim() || map.mapId;
       const name = document.createElement("div");
       name.className = "sp-editor-map-item-title";
-      name.textContent = map.name || map.mapId;
+      name.textContent = isRootMap ? `★ ${displayName}` : displayName;
 
       const meta = document.createElement("div");
       meta.className = "sp-editor-map-item-meta";
       meta.textContent = map.mapId;
-      if (workingState.manifest.defaultMapId === map.mapId) {
-        const rootBadge = document.createElement("span");
-        rootBadge.className = "sp-editor-map-root-badge";
-        rootBadge.textContent = "Padrão";
-        rootBadge.title = "Mapa raiz padrão";
-        meta.appendChild(document.createTextNode(" "));
-        meta.appendChild(rootBadge);
-      }
 
       item.append(name, meta);
       item.addEventListener("click", () => {
@@ -5469,7 +5467,7 @@ export class Visual implements IVisual {
     nameLabel.textContent = "Nome do mapa";
     const nameInput = document.createElement("input");
     nameInput.className = "sp-editor-input";
-    nameInput.value = workingState.activeMap.name || workingState.activeMap.mapId;
+    nameInput.value = workingState.activeMap.name || "";
     nameInput.setAttribute("data-editor-browser-map-name", "1");
     nameLabel.appendChild(nameInput);
     const levelLabel = document.createElement("label");
@@ -5866,7 +5864,7 @@ export class Visual implements IVisual {
       manifest.maps = [
         {
           mapId: this.activeMap.mapId || "default",
-          name: this.activeMap.map?.name || this.activeMap.mapId || "Padrão",
+          name: this.activeMap.map?.name || undefined,
           svgText: this.activeMap.svgText || this.settings.svgSettings.svgText,
           level: 0,
           drillPath: [],
@@ -6213,7 +6211,7 @@ export class Visual implements IVisual {
       if (!mapId) return;
       manifest.maps.push({
         mapId,
-        name: this.readRowValue(row, "name") || mapId,
+        name: this.readRowValue(row, "name") || existing?.name || mapId,
         svgText: existing?.svgText || (mapId === fallbackActiveMapId ? this.activeMap.svgText : this.settings.svgSettings.svgText),
         level: existing?.level,
         drillPath: existing?.drillPath || [],

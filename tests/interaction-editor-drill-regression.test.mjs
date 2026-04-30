@@ -115,7 +115,8 @@ assert(/buildSvgEditorOverlay/.test(dialogTs), "MapEditorDialog.ts deve oferecer
 assert(/Tornar Mapa Raiz/.test(dialogTs), "Menu de mapas deve permitir tornar um mapa existente como raiz.");
 assert(/manifest\.defaultMapId\s*=\s*map\.mapId/.test(dialogTs), "Acao Tornar Mapa Raiz deve atualizar defaultMapId.");
 assert(!/name:\s*"Mapa principal"/.test(visualTs), "visual nao deve renomear mapas automaticamente para Mapa principal.");
-assert(/sp-editor-map-root-badge/.test(visualTs) && /sp-editor-map-root-badge::before/.test(visualLess), "mapa raiz deve ser indicado por badge/icone, sem renomear o mapa.");
+assert(/createIcon\(isRootMap \? "star" : "map"\)/.test(dialogTs), "mapa raiz no dialogo deve ser indicado apenas por estrela na esquerda.");
+assert(/name\.textContent = isRootMap \? `★ \$\{displayName\}` : displayName;/.test(visualTs), "mapa raiz no editor legado deve ser indicado apenas por estrela no titulo.");
 assert(/createButton\("SVG", "svg"/.test(dialogTs), "a tela detalhada deve expor um botao SVG.");
 const detailViewStart = dialogTs.indexOf("private buildDetailView");
 const detailViewEnd = dialogTs.indexOf("const main = document.createElement", detailViewStart);
@@ -150,6 +151,9 @@ assert(/onSelectArea\?\.\(logicalAreaId\)/.test(dialogTs), "Clique no mapa deve 
 assert(/const levelInput = shell\.querySelector<HTMLInputElement>\("\[data-editor-browser-map-level='1'\]"\);\s*if \(levelInput\)/.test(dialogTs), "level do metadata so deve ser sobrescrito quando o input existir no DOM atual.");
 assert(/const drillPathInput = shell\.querySelector<HTMLInputElement>\("\[data-editor-browser-map-path='1'\]"\);\s*if \(drillPathInput\)/.test(dialogTs), "drillPath do metadata so deve ser sobrescrito quando o input existir no DOM atual.");
 assert(/const defaultInput = shell\.querySelector<HTMLInputElement>\("\[data-editor-browser-default='1'\]"\);\s*if \(defaultInput\)/.test(dialogTs), "mapa padrao so deve ser reavaliado quando o checkbox de metadata existir no DOM atual.");
+assert(/if \(nameInput\)\s*\{[\s\S]{0,120}activeMap\.name = nameInput\.value\.trim\(\) \|\| activeMap\.name;/.test(visualTs), "nome do mapa so deve ser sobrescrito no editor legado quando o input existir no DOM atual, sem cair para default.");
+assert(/name:\s*this\.readRowValue\(row,\s*"name"\)\s*\|\|\s*existing\?\.name\s*\|\|\s*mapId/.test(visualTs), "remontagem do manifesto deve preservar o nome original do SVG antes de cair para mapId/default.");
+assert(/name:\s*this\.activeMap\.map\?\.name \|\| undefined/.test(visualTs), "estado inicial do editor legado nao deve injetar mapId/default como nome do mapa raiz.");
 assert(/allowMapUploads/.test(dialogTs), "MapEditorDialog.ts deve suportar upload de mapas condicionado ao host.");
 assert(/addMapMenuOpen/.test(dialogTs), "Botao Add deve controlar menu suspenso.");
 assert(/buildAddMapMenu/.test(dialogTs), "Editor deve renderizar menu suspenso do Add.");

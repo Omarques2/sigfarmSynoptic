@@ -843,7 +843,7 @@ class MapEditorDialogApp {
     this.pendingAreaSearchSelection = null;
   }
 
-  private createIcon(name: "add" | "minus" | "edit" | "delete" | "map" | "search" | "export" | "metadata" | "svg" | "back" | "close" | "overflow" | "eye"): HTMLElement {
+  private createIcon(name: "add" | "minus" | "edit" | "delete" | "map" | "search" | "export" | "metadata" | "svg" | "back" | "close" | "overflow" | "eye" | "star"): HTMLElement {
     const ns = "http://www.w3.org/2000/svg";
     const span = document.createElement("span");
     span.className = `sp-editor-icon sp-editor-icon--${name}`;
@@ -858,6 +858,13 @@ class MapEditorDialogApp {
     const line = (...coords: string[]) => {
       const node = document.createElementNS(ns, "path");
       node.setAttribute("d", coords.join(" "));
+      svg.appendChild(node);
+    };
+    const solid = (d: string) => {
+      const node = document.createElementNS(ns, "path");
+      node.setAttribute("d", d);
+      node.setAttribute("fill", "currentColor");
+      node.setAttribute("stroke", "none");
       svg.appendChild(node);
     };
     switch (name) {
@@ -899,6 +906,9 @@ class MapEditorDialogApp {
         break;
       case "eye":
         line("M2.5 10s2.7-4.5 7.5-4.5 7.5 4.5 7.5 4.5-2.7 4.5-7.5 4.5S2.5 10 2.5 10z", "M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z");
+        break;
+      case "star":
+        solid("M10 2.6l2.3 4.66 5.14.75-3.72 3.63.88 5.13L10 14.97l-4.6 2.42.88-5.13-3.72-3.63 5.14-.75L10 2.6z");
         break;
     }
     span.appendChild(svg);
@@ -1322,6 +1332,10 @@ class MapEditorDialogApp {
     this.addMapMenuOpen = false;
     this.syncResult(true);
     return { ok: true, mapId };
+  }
+
+  private getMapDisplayName(map: MapRegistryMap): string {
+    return (map.name || "").trim() || map.mapId;
   }
 
   private applyBrowserInputs(shell: HTMLElement): void {
@@ -4016,16 +4030,18 @@ class MapEditorDialogApp {
         selectBtn.className = map.mapId === activeMap.mapId ? "sp-editor-map-item is-active" : "sp-editor-map-item";
         const row = document.createElement("div");
         row.className = "sp-editor-list-row";
-        row.append(this.createIcon("map"));
+        const isRootMap = this.manifest.defaultMapId === map.mapId;
+        row.append(this.createIcon(isRootMap ? "star" : "map"));
         const body = document.createElement("div");
         body.className = "sp-editor-list-body";
         if (this.renamingMapId === map.mapId) {
           const nameInput = document.createElement("input");
           nameInput.className = "sp-editor-input sp-editor-map-rename-input";
-          nameInput.value = map.name || map.mapId;
+          nameInput.value = map.name || "";
           const commitRename = () => {
             if (this.renamingMapId !== map.mapId) return;
-            map.name = nameInput.value.trim() || map.mapId;
+            const nextName = nameInput.value.trim();
+            map.name = nextName || map.name;
             this.renamingMapId = null;
             this.openMapActionMenuId = null;
             this.syncResult(true);
@@ -4052,12 +4068,12 @@ class MapEditorDialogApp {
         } else {
           const title = document.createElement("span");
           title.className = "sp-editor-map-item-title";
-          title.textContent = map.name || map.mapId;
+          title.textContent = this.getMapDisplayName(map);
           body.appendChild(title);
         }
         const meta = document.createElement("span");
         meta.className = "sp-editor-map-item-meta";
-        meta.textContent = `${map.mapId}${this.manifest.defaultMapId === map.mapId ? " • padrao" : ""}`;
+        meta.textContent = map.mapId;
         body.appendChild(meta);
         row.appendChild(body);
         selectBtn.appendChild(row);
@@ -4145,10 +4161,10 @@ class MapEditorDialogApp {
     header.className = "sp-editor-browser-detail-header";
     const heading = document.createElement("div");
     const title = document.createElement("h3");
-    title.textContent = activeMap.name || activeMap.mapId;
+    title.textContent = this.getMapDisplayName(activeMap);
     const subtitle = document.createElement("div");
     subtitle.className = "sp-editor-browser-detail-subtitle";
-    subtitle.textContent = `${activeMap.name || activeMap.mapId}.svg`;
+    subtitle.textContent = `${this.getMapDisplayName(activeMap)}.svg`;
     heading.append(title, subtitle);
 
     const headerActions = document.createElement("div");
