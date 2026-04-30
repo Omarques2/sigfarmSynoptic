@@ -8,6 +8,7 @@ const settingsTs = fs.readFileSync("src/settings.ts", "utf8");
 assert(/createHelpOverlay/.test(visualTs), "visual.ts deve manter overlay de tutorial/ajuda.");
 assert(/helpEl/.test(visualTs), "visual.ts deve manter host de tutorial/ajuda.");
 assert(/getHelpPages/.test(visualTs), "visual.ts deve manter paginas de tutorial.");
+assert(/focus and zoom on the current map/.test(visualTs), "tutorial deve refletir comportamento atual de foco/zoom sem drill.");
 assert(/showEditorButton/.test(settingsTs), "settings.ts deve manter botao Editor.");
 assert(/sp-help/.test(visualLess), "style deve manter estilos do overlay de ajuda.");
 

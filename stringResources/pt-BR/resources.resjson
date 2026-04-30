@@ -86,7 +86,7 @@
   "Help_4_B4": "Toggles de lado controlam direção dos callouts.",
   "Help_5_Title": "Drill e editor",
   "Help_5_B1": "Drill só funciona quando mapas-alvo estão configurados explicitamente.",
-  "Help_5_B2": "Áreas sem destino de drill devem apenas selecionar.",
+  "Help_5_B2": "Áreas sem destino de drill devem apenas focar e dar zoom no mapa atual.",
   "Help_5_B3": "Editor só aparece em contexto de autoria suportado.",
   "Help_5_B4": "Use editor para manter registro, drill e rótulos juntos.",
   "Help_6_Title": "Segurança e limites",

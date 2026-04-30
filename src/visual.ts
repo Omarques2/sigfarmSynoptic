@@ -30,6 +30,14 @@ import {
   resolveDrillMap,
   validateMapRegistryManifestIssues
 } from "./drillMapResolver";
+import {
+  getConfiguredCategoryColumns as getConfiguredCategoryColumnsFromState,
+  getEffectiveCategoryColumns as getEffectiveCategoryColumnsFromState,
+  getEffectiveCurrentCategory as getEffectiveCurrentCategoryFromState,
+  getEffectiveCurrentLevel as getEffectiveCurrentLevelFromState,
+  getSingleCategoryValue as getSingleCategoryValueFromState
+} from "./drillHierarchyState";
+import type { QueryStateCategoryProjectionLike } from "./drillHierarchyState";
 import type {
   DrillMapContext,
   DrillMapResolutionTrace,
@@ -2246,24 +2254,26 @@ export class Visual implements IVisual {
     const drillableRoles = dataRoles?.drillableRoles;
     const categoryDrillTypes = drillableRoles?.category;
     const drillTypes = Array.isArray(categoryDrillTypes) ? categoryDrillTypes : [];
-    const categoryColumnCount = this.getCategoryColumns(dv).length;
+    const configuredCategoryCount = this.getCategoryColumns(dv).length;
+    const effectiveCategoryCount = this.getEffectiveCategoryColumns(dv).length;
     const currentLevel = this.getCurrentResolvedLevel();
     const hostReportsDrillUp = drillTypes.includes(1);
-    const hostReportsDrillDown = drillTypes.length > 0 ? drillTypes.includes(2) : categoryColumnCount > 1;
+    const hasHierarchyConfigured = configuredCategoryCount > 1;
+    const hostReportsDrillDown = drillTypes.length > 0 ? drillTypes.includes(2) : hasHierarchyConfigured;
     const hostReportsAnyDrill = drillTypes.length > 0;
-    const hasHierarchyInDataView = categoryColumnCount > 1;
     const isInsideDrillHierarchy = currentLevel > 0;
     const activeMapHasNext = this.activeMapHasExplicitNextDrillTarget();
 
     this.hasCategoryDrillHierarchy =
-      hasHierarchyInDataView ||
+      hasHierarchyConfigured ||
+      effectiveCategoryCount > 1 ||
       isInsideDrillHierarchy ||
       hostReportsAnyDrill;
 
     this.canHostDrillDown =
       this.settings.drillMaps.enabled &&
       activeMapHasNext &&
-      (hostReportsDrillDown || hasHierarchyInDataView || isInsideDrillHierarchy);
+      (hostReportsDrillDown || isInsideDrillHierarchy);
 
     this.canHostDrillUp = isInsideDrillHierarchy || hostReportsDrillUp;
 
@@ -3225,7 +3235,7 @@ export class Visual implements IVisual {
         title: this.t("Help_5_Title", "Drill and editor"),
         bullets: [
           this.t("Help_5_B1", "Drill only works when target maps are explicitly configured."),
-          this.t("Help_5_B2", "Areas without drill target should only select."),
+          this.t("Help_5_B2", "Areas without drill target should only focus and zoom on the current map."),
           this.t("Help_5_B3", "Editor is available only in supported authoring context."),
           this.t("Help_5_B4", "Use editor to maintain registry, drill, and labels together.")
         ]
@@ -4463,7 +4473,39 @@ export class Visual implements IVisual {
 
   private getCategoryColumns(dv?: DataView): DataViewCategoryColumn[] {
     const cat = dv?.categorical as DataViewCategorical | undefined;
-    return (cat?.categories ?? []).filter((column) => !!column?.source?.roles?.category);
+    return getConfiguredCategoryColumnsFromState(cat?.categories ?? []) as DataViewCategoryColumn[];
+  }
+
+  private getQueryStateCategoryProjections(dv?: DataView): QueryStateCategoryProjectionLike[] {
+    const candidates = [
+      (dv as any)?.__queryStateLike?.category?.projections,
+      (dv as any)?.queryState?.category?.projections,
+      (dv as any)?.categorical?.__queryStateLike?.category?.projections,
+      (this.lastUpdateOptions as any)?.__queryStateLike?.category?.projections,
+      (this.lastUpdateOptions as any)?.queryState?.category?.projections
+    ];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) return candidate as QueryStateCategoryProjectionLike[];
+    }
+    return [];
+  }
+
+  private getEffectiveCategoryColumns(dv?: DataView): DataViewCategoryColumn[] {
+    const configured = this.getCategoryColumns(dv);
+    const projections = this.getQueryStateCategoryProjections(dv);
+    return getEffectiveCategoryColumnsFromState(configured, projections) as DataViewCategoryColumn[];
+  }
+
+  private getEffectiveCurrentLevel(dv?: DataView): number {
+    const configured = this.getCategoryColumns(dv);
+    const projections = this.getQueryStateCategoryProjections(dv);
+    return getEffectiveCurrentLevelFromState(configured, projections);
+  }
+
+  private getEffectiveCurrentCategory(dv?: DataView): DataViewCategoryColumn | null {
+    const configured = this.getCategoryColumns(dv);
+    const projections = this.getQueryStateCategoryProjections(dv);
+    return (getEffectiveCurrentCategoryFromState(configured, projections) as DataViewCategoryColumn | null) || null;
   }
 
   private getCategoryColumnName(column?: DataViewCategoryColumn | null): string | null {
@@ -4472,14 +4514,7 @@ export class Visual implements IVisual {
   }
 
   private getSingleCategoryValue(column: DataViewCategoryColumn): string | null {
-    const unique = new Set<string>();
-    for (const value of column.values || []) {
-      const text = String(value ?? "").trim();
-      if (!text) continue;
-      unique.add(text);
-      if (unique.size > 1) return null;
-    }
-    return unique.size === 1 ? Array.from(unique)[0] : null;
+    return getSingleCategoryValueFromState(column);
   }
 
   private getCurrentDrillValuePath(categoryColumns: DataViewCategoryColumn[]): string[] {
@@ -4545,17 +4580,21 @@ export class Visual implements IVisual {
 
   private resolveActiveMapFromDrillPath(defaultSvgText: string, dv?: DataView): ActiveMapResolution {
     const manifest = parseMapRegistryManifest(this.settings.mapRegistry.manifestJson);
-    const categoryColumns = this.getCategoryColumns(dv);
-    const currentPath = categoryColumns
+    const configuredCategoryColumns = this.getCategoryColumns(dv);
+    const effectiveCategoryColumns = this.getEffectiveCategoryColumns(dv);
+    const currentPath = effectiveCategoryColumns
       .map((column) => this.getCategoryColumnName(column))
       .filter((name): name is string => !!name)
       .map((name) => name.trim())
       .filter((name) => !!name);
-    const currentValuePath = this.getCurrentDrillValuePath(categoryColumns);
+    const currentValuePath = this.getCurrentDrillValuePath(effectiveCategoryColumns);
     this.currentDrillPath = currentPath;
-    const currentLevel = Math.max(0, categoryColumns.length - 1);
+    const currentLevel = Math.max(0, effectiveCategoryColumns.length - 1);
     const navDirection = this.getDrillNavigationDirection(currentLevel, currentPath);
-    const currentCategory = categoryColumns[currentLevel] || categoryColumns[categoryColumns.length - 1] || null;
+    const currentCategory =
+      effectiveCategoryColumns[currentLevel] ||
+      effectiveCategoryColumns[effectiveCategoryColumns.length - 1] ||
+      null;
     this.activeCategoryQueryName = this.getCategoryColumnName(currentCategory);
     const categoryMatchScores: DrillMapContext["categoryMatchScores"] = {};
     let pendingDrillSource = this.pendingDrillSource;
@@ -4571,11 +4610,11 @@ export class Visual implements IVisual {
       }
     }
 
-    if (this.settings.drillMaps.enabled && categoryColumns.length > 0) {
+    if (this.settings.drillMaps.enabled && configuredCategoryColumns.length > 0) {
       manifest.maps.forEach((candidate) => {
         const svgText = (candidate.svgText || "").trim();
         if (!svgText) return;
-        categoryColumns.forEach((column, categoryIndex) => {
+        configuredCategoryColumns.forEach((column, categoryIndex) => {
           const rawScore = this.getCategoryMapMatchScore(svgText, column);
           const levelBonus = Number.isFinite(candidate.level) && candidate.level === categoryIndex ? 1 : 0;
           const currentLevelBonus = categoryIndex === currentLevel ? 2 : 0;
@@ -6398,7 +6437,7 @@ export class Visual implements IVisual {
     this.hasHighlights = false;
     const cat = dv?.categorical as DataViewCategorical | undefined;
     const catCols = cat?.categories ?? [];
-    const categoryCols = this.getCategoryColumns(dv);
+    const categoryCols = this.getEffectiveCategoryColumns(dv);
     const currentCategory =
       categoryCols.find((column) => this.getCategoryColumnName(column) === this.activeCategoryQueryName) ||
       categoryCols[categoryCols.length - 1] ||

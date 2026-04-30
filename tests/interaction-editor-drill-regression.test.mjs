@@ -633,10 +633,17 @@ assert(/this\.focusElements\(\[el\]\)/.test(preFocusMethodBody), "pre-foco de dr
 assert(/updateHostDrillState/.test(visualTs), "visual deve ler metadata.dataRoles.drillableRoles e sincronizar permissao de drill.");
 assert(/setCanDrill/.test(visualTs), "visual deve informar ao host quando drill down esta permitido.");
 assert(/drillableRoles\?\.category/.test(visualTs), "visual deve consultar drillableRoles.category para saber se o drill nativo esta ativo.");
+assert(/private getQueryStateCategoryProjections\(dv\?: DataView\): QueryStateCategoryProjectionLike\[]/.test(visualTs), "visual deve ler projeções de query state quando o host expuser estado ativo.");
+assert(/private getEffectiveCategoryColumns\(dv\?: DataView\): DataViewCategoryColumn\[]/.test(visualTs), "visual deve distinguir hierarquia configurada de hierarquia efetiva.");
+assert(/private getEffectiveCurrentLevel\(dv\?: DataView\): number/.test(visualTs), "visual deve expor helper de nivel efetivo.");
+assert(/private getEffectiveCurrentCategory\(dv\?: DataView\): DataViewCategoryColumn \| null/.test(visualTs), "visual deve resolver categoria efetiva atual.");
 assert(/if \(!this\.canHostDrillDown\) return null;/.test(visualTs), "visual nao deve criar rota de drill quando o drill nativo do Power BI esta desligado.");
 assert(/const hostReportsDrillDown\s*=[\s\S]{0,220}drillTypes\.includes\(2\)/.test(visualTs), "visual deve ler drillableRoles do host para saber quando drill down esta disponivel.");
 assert(/const shouldEnableDrillControls\s*=[\s\S]{0,260}this\.canHostDrillUp[\s\S]{0,260}this\.canHostDrillDown/.test(visualTs), "controles nativos devem continuar habilitados em niveis profundos para preservar drill up.");
 assert(/currentLevel > 0/.test(visualTs), "visual deve manter controles de drill quando esta dentro da hierarquia.");
+assert(/const configuredCategoryCount = this\.getCategoryColumns\(dv\)\.length;[\s\S]{0,220}const effectiveCategoryCount = this\.getEffectiveCategoryColumns\(dv\)\.length;/.test(visualTs), "estado de drill do host deve diferenciar colunas configuradas de colunas efetivamente ativas.");
+assert(/const currentLevel = Math\.max\(0, effectiveCategoryColumns\.length - 1\);/.test(visualTs), "resolucao de mapa deve usar stack efetiva, nao todas as colunas configuradas.");
+assert(/const categoryCols = this\.getEffectiveCategoryColumns\(dv\);/.test(visualTs), "buildDataMap deve usar categoria efetiva atual.");
 assert(!/this\.triggerHostDrillDown\(\);/.test(visualTs), "clique comum em area nao deve chamar host.drill automaticamente; isso fura o drill mode nativo.");
 assert(/clearPotentialDrillClickState/.test(visualTs), "visual deve limpar estado pendente de drill quando nao houver drill real.");
 assert(/getDrillNavigationDirection/.test(visualTs), "visual deve detectar subida\/descida para limpar pendingDrillSource corretamente.");

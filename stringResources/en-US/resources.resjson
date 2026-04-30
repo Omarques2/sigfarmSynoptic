@@ -86,7 +86,7 @@
   "Help_4_B4": "Allowed-side toggles control callout direction.",
   "Help_5_Title": "Drill and editor",
   "Help_5_B1": "Drill only works when target maps are explicitly configured.",
-  "Help_5_B2": "Areas without drill target should only select.",
+  "Help_5_B2": "Areas without drill target should only focus and zoom on the current map.",
   "Help_5_B3": "Editor is available only in supported authoring context.",
   "Help_5_B4": "Use editor to maintain registry, drill, and labels together.",
   "Help_6_Title": "Security and limits",
