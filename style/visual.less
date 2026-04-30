@@ -84,6 +84,66 @@ p {
     line-height: 1;
 }
 
+.sp-empty-state {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 18px;
+    color: #1f2937;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    text-align: center;
+    pointer-events: none;
+}
+
+.sp-empty-state-card {
+    box-sizing: border-box;
+    max-width: 440px;
+    padding: 14px 16px;
+    border: 1px solid #d8e1eb;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+    pointer-events: auto;
+}
+
+.sp-empty-state-title {
+    margin-bottom: 6px;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.sp-empty-state-body {
+    color: #4b5563;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.sp-empty-state-action {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border: 1px solid #0f8c79;
+    border-radius: 10px;
+    background: #0f8c79;
+    color: #ffffff;
+    cursor: pointer;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.sp-empty-state-action:hover,
+.sp-empty-state-action:focus-visible {
+    background: #0b7364;
+    border-color: #0b7364;
+    outline: 2px solid rgba(15, 140, 121, 0.24);
+    outline-offset: 2px;
+}
+
 .sp-help-header {
     display: flex;
     align-items: center;
@@ -374,6 +434,28 @@ p {
 .sp-editor-inspector-title span {
     font-size: 12px;
     color: #5d7088;
+}
+
+.sp-editor-map-root-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 4px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid rgba(15, 148, 136, 0.22);
+    background: rgba(15, 148, 136, 0.1);
+    color: #0f766e;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.sp-editor-map-root-badge::before {
+    content: "★";
+    font-size: 9px;
+    line-height: 1;
 }
 
 .sp-editor-map-list {

@@ -83,7 +83,7 @@ type DrillFocusPhase = "idle" | "mapResolved" | "domInserted" | "stylesApplied" 
 type DrillClickRoute = {
   sourceMapId: string;
   sourceAreaId: string;
-  targetMapId: string;
+  targetMapId?: string;
 };
 type ResolvedMapAreaDefinition = {
   key: string;
@@ -956,6 +956,12 @@ type SanitizationReport = {
   removedStyleParts: number;
 };
 
+type SanitizedSvgCacheEntry = {
+  signature: string;
+  svg: SVGSVGElement | null;
+  report: SanitizationReport;
+};
+
 type UiLanguage = "pt" | "en";
 
 function resolveLanguage(pref: string | undefined | null): UiLanguage {
@@ -1547,6 +1553,10 @@ export class Visual implements IVisual {
   private regionBBoxesById: Map<string, GeometryBBox> = new Map<string, GeometryBBox>();
   private regionIds: string[] = [];
   private lastRenderedSvgSignature: string | null = null;
+  private svgSanitizationCache: Map<string, SanitizedSvgCacheEntry> = new Map();
+  private svgPrewarmQueue: string[] = [];
+  private svgPrewarmScheduled = false;
+  private readonly maxSvgSanitizationCacheEntries = 24;
   private regionStyleBatchId: number | null = null;
   private regionStyleBatchToken = 0;
   private pendingDrillFocus = false;
@@ -1555,7 +1565,7 @@ export class Visual implements IVisual {
   private drillFocusSettleToken = 0;
   private drillLoadingTimeout: number | null = null;
   private suppressSelectionFocusForPotentialDrill = false;
-  private potentialDrillFocusSuppressionMs = 2500;
+  private potentialDrillFocusSuppressionMs = 6000;
   private potentialDrillSelectionVisualDelayMs = 180;
   private potentialDrillClickTimer: number | null = null;
   private potentialDrillSelectionTimer: number | null = null;
@@ -1654,9 +1664,11 @@ export class Visual implements IVisual {
   private editorStatusIsError = false;
   private drillRevealSvgRoot: SVGSVGElement | null = null;
 
-  // host env
-  private hostEnv: number | undefined;
+  // host mode
   private lastUpdateOptions?: VisualUpdateOptions;
+  private lastViewMode: powerbi.ViewMode | string | number | undefined;
+  private lastEditMode: powerbi.EditMode | string | number | undefined;
+  private lastIsInFocus = false;
   private canHostDrillControls = false;
   private canHostDrillDown = false;
   private canHostDrillUp = false;
@@ -1680,7 +1692,6 @@ export class Visual implements IVisual {
     this.container = options.element;
     this.storageService = (this.host as any)?.storageService ?? null;
 
-    this.hostEnv = (this.host as any)?.hostEnv as number | undefined;
     this.localizationManager =
       (this.host as any)?.createLocalizationManager ? (this.host as any).createLocalizationManager() : undefined;
     this.formattingSettingsService = new FormattingSettingsService(this.localizationManager);
@@ -2091,7 +2102,8 @@ export class Visual implements IVisual {
     }
     const pendingSelectionIds = this.pendingPotentialDrillSelectionIds;
     if (!pendingSelectionIds) return;
-    this.clearPotentialDrillClickState(true);
+    this.pendingPotentialDrillSelectionIds = null;
+    this.pendingPotentialDrillSelectionContext = null;
     this.setSelectionFromIds(pendingSelectionIds, "self");
   }
 
@@ -2179,6 +2191,12 @@ export class Visual implements IVisual {
     if (areaOverride.drillMode === "none") return null;
     const targetMapId = areaOverride?.drillToMapId;
     if (!targetMapId) {
+      if (areaOverride.drillMode === "automatic" && this.activeMapCanAdvanceDrill(this.lastUpdateOptions?.dataViews?.[0])) {
+        return {
+          sourceMapId: this.activeMap.mapId,
+          sourceAreaId: svgAreaId
+        };
+      }
       this.warnDrillRouteDiagnostic("Area encontrada, mas sem drillToMapId.", {
         svgAreaId,
         areaKey: resolvedAreaKey,
@@ -2236,17 +2254,27 @@ export class Visual implements IVisual {
     };
   }
 
-  private activeMapHasExplicitNextDrillTarget(): boolean {
+  private activeMapCanAdvanceDrill(dv?: DataView): boolean {
     const manifest = this.activeMap?.manifest;
     const map = this.activeMap?.map;
     if (!manifest || !map?.areas) return false;
 
-    return Object.values(map.areas).some((area) => {
+    const hasExplicitTarget = Object.values(map.areas).some((area) => {
       if (!area?.drillToMapId) return false;
       if (area.drillMode === "none") return false;
       const target = manifest.maps.find((candidate) => candidate.mapId === area.drillToMapId);
       return !!target?.svgText?.trim();
     });
+    if (hasExplicitTarget) return true;
+
+    const configuredCategoryCount = this.getCategoryColumns(dv).length;
+    const currentLevel = this.getCurrentDataDrillLevel();
+    if (configuredCategoryCount <= currentLevel + 1) return false;
+
+    const hasAutomaticArea = Object.values(map.areas).some((area) => area && area.drillMode !== "none");
+    if (!hasAutomaticArea) return false;
+
+    return manifest.maps.some((candidate) => candidate.mapId !== map.mapId && !!candidate.svgText?.trim());
   }
 
   private updateHostDrillState(dv?: DataView): void {
@@ -2259,10 +2287,10 @@ export class Visual implements IVisual {
     const currentLevel = this.getCurrentResolvedLevel();
     const hostReportsDrillUp = drillTypes.includes(1);
     const hasHierarchyConfigured = configuredCategoryCount > 1;
-    const hostReportsDrillDown = drillTypes.length > 0 ? drillTypes.includes(2) : hasHierarchyConfigured;
+    const activeMapCanAdvance = this.activeMapCanAdvanceDrill(dv);
+    const hostReportsDrillDown = drillTypes.includes(2) || (hasHierarchyConfigured && activeMapCanAdvance);
     const hostReportsAnyDrill = drillTypes.length > 0;
     const isInsideDrillHierarchy = currentLevel > 0;
-    const activeMapHasNext = this.activeMapHasExplicitNextDrillTarget();
 
     this.hasCategoryDrillHierarchy =
       hasHierarchyConfigured ||
@@ -2272,7 +2300,7 @@ export class Visual implements IVisual {
 
     this.canHostDrillDown =
       this.settings.drillMaps.enabled &&
-      activeMapHasNext &&
+      activeMapCanAdvance &&
       (hostReportsDrillDown || isInsideDrillHierarchy);
 
     this.canHostDrillUp = isInsideDrillHierarchy || hostReportsDrillUp;
@@ -2280,7 +2308,7 @@ export class Visual implements IVisual {
     const shouldEnableDrillControls =
       this.settings.drillMaps.enabled &&
       this.hasCategoryDrillHierarchy &&
-      (this.canHostDrillUp || this.canHostDrillDown || isInsideDrillHierarchy || activeMapHasNext);
+      (this.canHostDrillUp || this.canHostDrillDown || isInsideDrillHierarchy || activeMapCanAdvance);
 
     this.canHostDrillControls = shouldEnableDrillControls;
     const setCanDrill = (this.host as any)?.setCanDrill;
@@ -2452,18 +2480,53 @@ export class Visual implements IVisual {
       });
   }
 
-  // --- regra: permitir upload SOMENTE no Power BI Desktop ---
-  private canShowSvgPickerUI(): boolean {
-    const env = this.hostEnv ?? (this.host as any)?.hostEnv;
-    if (env === undefined || env === null) return false;
+  private updateHostMode(options: VisualUpdateOptions): void {
+    this.lastViewMode = (options as any)?.viewMode;
+    this.lastEditMode = (options as any)?.editMode;
+    this.lastIsInFocus = !!(options as any)?.isInFocus;
+  }
 
-    // CustomVisualHostEnv.Desktop = 1<<2 = 4
-    const DESKTOP_FLAG = 1 << 2;
-    return (env & DESKTOP_FLAG) === DESKTOP_FLAG;
+  private hostModeMatches(value: unknown, enumValue: unknown, numericValue: number, names: string[]): boolean {
+    if (value === enumValue || value === numericValue) return true;
+    const raw = String(value ?? "").toLowerCase();
+    return names.some((name) => raw === name.toLowerCase());
+  }
+
+  private isAdvancedEditMode(options?: VisualUpdateOptions): boolean {
+    const editMode = (options as any)?.editMode ?? this.lastEditMode;
+    return this.hostModeMatches(editMode, (powerbi as any)?.EditMode?.Advanced, 1, ["Advanced"]);
+  }
+
+  private isReportEditMode(options?: VisualUpdateOptions): boolean {
+    const viewMode = (options as any)?.viewMode ?? this.lastViewMode;
+    return (
+      this.hostModeMatches(viewMode, (powerbi as any)?.ViewMode?.Edit, 1, ["Edit"]) ||
+      this.hostModeMatches(viewMode, (powerbi as any)?.ViewMode?.InFocusEdit, 2, ["InFocusEdit", "InFocus"]) ||
+      this.isAdvancedEditMode(options)
+    );
+  }
+
+  private isAdvancedAuthoringMode(options?: VisualUpdateOptions): boolean {
+    const viewMode = (options as any)?.viewMode ?? this.lastViewMode;
+    const isInFocus = typeof (options as any)?.isInFocus === "boolean" ? !!(options as any).isInFocus : this.lastIsInFocus;
+    return (
+      this.isAdvancedEditMode(options) ||
+      this.hostModeMatches(viewMode, (powerbi as any)?.ViewMode?.InFocusEdit, 2, ["InFocusEdit"]) ||
+      (isInFocus && this.isReportEditMode(options))
+    );
+  }
+
+  private canShowAuthoringControls(options?: VisualUpdateOptions): boolean {
+    if (!this.settings.editor.enabled) return false;
+    return this.isReportEditMode(options) || this.isAdvancedAuthoringMode(options);
+  }
+
+  private canPersistAuthoringProperties(options?: VisualUpdateOptions): boolean {
+    return this.canShowAuthoringControls(options) && typeof (this.host as any)?.persistProperties === "function";
   }
 
   private persistSvgText(text: string): void {
-    if (!this.canShowSvgPickerUI()) return;
+    if (!this.canPersistAuthoringProperties(this.lastUpdateOptions)) return;
     const persist = (this.host as any)?.persistProperties;
     if (typeof persist !== "function") return;
 
@@ -2742,17 +2805,17 @@ export class Visual implements IVisual {
   }
 
   private canExposeEditorUi(options?: VisualUpdateOptions): boolean {
-    if (!this.settings.editor.enabled) return false;
-    if (!this.canShowSvgPickerUI()) return false;
-    return true;
+    return this.canShowAuthoringControls(options);
   }
 
   private canShowEditorButton(options?: VisualUpdateOptions, hasSvgConfigured = false): boolean {
-    return this.canExposeEditorUi(options) && this.settings.editor.showEditorButton && hasSvgConfigured;
+    void hasSvgConfigured;
+    return this.canExposeEditorUi(options) && this.settings.editor.showEditorButton;
   }
 
   private canShowHelpButton(options?: VisualUpdateOptions, hasSvgConfigured = false): boolean {
-    return this.canExposeEditorUi(options) && hasSvgConfigured;
+    void hasSvgConfigured;
+    return this.canExposeEditorUi(options);
   }
 
   private canUseModalEditor(options?: VisualUpdateOptions): boolean {
@@ -2781,7 +2844,7 @@ export class Visual implements IVisual {
       viewMode: this.editorViewMode,
       areaSearch: this.editorAreaSearch,
       inspectorTab: this.editorInspectorTab === "Drill" ? "Drill" : "General",
-      allowMapUploads: this.canShowSvgPickerUI(),
+      allowMapUploads: this.canShowAuthoringControls(this.lastUpdateOptions),
       rowsByKey,
       drillContext: {
         currentDrillPath: [...this.currentDrillPath],
@@ -2918,7 +2981,7 @@ export class Visual implements IVisual {
       fontWeight: "700"
     } as CSSStyleDeclaration);
     ctaButton.addEventListener("click", () => {
-      if (!this.canShowSvgPickerUI()) return;
+      if (!this.canShowAuthoringControls(this.lastUpdateOptions)) return;
       this.fileInput.click();
     });
     this.uploadCta.appendChild(ctaButton);
@@ -2927,16 +2990,22 @@ export class Visual implements IVisual {
     this.fileInput = document.createElement("input");
     this.fileInput.type = "file";
     this.fileInput.accept = ".svg,image/svg+xml";
+    this.fileInput.multiple = true;
     this.fileInput.style.display = "none";
     this.fileInput.addEventListener("change", async () => {
-      if (!this.canShowSvgPickerUI()) return;
-      const file = this.fileInput.files?.[0];
-      if (!file) return;
+      if (!this.canShowAuthoringControls(this.lastUpdateOptions)) return;
+      const files = Array.from(this.fileInput.files || []).filter((file) => /\.svg$/i.test(file.name) || file.type === "image/svg+xml");
+      if (files.length === 0) return;
 
-      const text = await file.text();
-      const dataUri = "data:image/svg+xml;utf8," + encodeURIComponent(text);
-      this.persistSvgText(dataUri);
-      this.seedDraftFromUploadedSvg(dataUri, file.name, false);
+      for (const [index, file] of files.entries()) {
+        const text = await file.text();
+        const dataUri = "data:image/svg+xml;utf8," + encodeURIComponent(text);
+        if (index === 0) {
+          this.persistSvgText(dataUri);
+        }
+        this.seedDraftFromUploadedSvg(dataUri, file.name, index > 0);
+      }
+      this.setEditorStatus(`${files.length} mapa${files.length === 1 ? "" : "s"} preparado${files.length === 1 ? "" : "s"} no editor. Revise e salve quando concluir.`, false);
       this.editorOpen = !this.canUseModalEditor(this.lastUpdateOptions);
       this.editorViewMode = "browser";
 
@@ -2984,7 +3053,7 @@ export class Visual implements IVisual {
       this.uploadBtn.style.transform = "translateY(0)";
     });
     this.uploadBtn.addEventListener("click", () => {
-      if (!this.canShowSvgPickerUI()) return;
+      if (!this.canShowAuthoringControls(this.lastUpdateOptions)) return;
       this.fileInput.click();
     });
 
@@ -3300,7 +3369,7 @@ export class Visual implements IVisual {
 
   private updateHelpVisibility(hasSvg: boolean, forceShow: boolean = false) {
     if (!this.helpEl) return;
-    if (!this.canShowSvgPickerUI()) {
+    if (!this.canShowHelpButton(this.lastUpdateOptions, hasSvg)) {
       this.helpManualOpen = false;
       this.helpEl.style.display = "none";
       return;
@@ -3311,7 +3380,7 @@ export class Visual implements IVisual {
       this.helpShownThisSession = true;
     }
     const shouldShow =
-      hasSvg &&
+      (hasSvg || this.helpManualOpen) &&
       (
         this.helpManualOpen ||
         (show && !this.helpDismissed && (forceShow || !this.helpSeenPersisted || this.helpShownThisSession))
@@ -3541,14 +3610,12 @@ export class Visual implements IVisual {
     this.applySelectionVisualState();
   }
 
-  private setUploadUIVisibility(hasSvgConfigured: boolean) {
-    const allow = this.canShowSvgPickerUI();
-    this.uploadBtn.style.display = "none";
-    this.uploadCta.style.display = !hasSvgConfigured && allow ? "flex" : "none";
-  }
-
-  private setEditorButtonVisibility(hasSvgConfigured: boolean, options?: VisualUpdateOptions) {
+  private syncAuthoringUiVisibility(hasSvgConfigured: boolean, options?: VisualUpdateOptions) {
     if (!this.editorButton || !this.helpButton) return;
+    const allow = this.canShowAuthoringControls(options);
+    void allow;
+    this.uploadBtn.style.display = "none";
+    this.uploadCta.style.display = "none";
     const show = this.canShowEditorButton(options, hasSvgConfigured);
     this.editorButton.style.display = show ? "inline-flex" : "none";
     this.editorButton.setAttribute("aria-hidden", show ? "false" : "true");
@@ -3567,49 +3634,45 @@ export class Visual implements IVisual {
     }
   }
 
-  private showNoSvgMessageOutsideDesktop() {
+  private renderNoMapState(hasSvgConfigured: boolean, options?: VisualUpdateOptions) {
+    void hasSvgConfigured;
     this.clearSvg();
 
     const msg = document.createElement("div");
-    msg.className = "sp-no-svg-msg";
-    Object.assign(msg.style, {
-      position: "absolute",
-      inset: "0",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "18px",
-      textAlign: "center",
-      color: "rgba(255,255,255,0.85)",
-      fontFamily: "Segoe UI, -apple-system, Roboto, Arial, sans-serif"
-    } as CSSStyleDeclaration);
+    msg.className = "sp-empty-state";
+    msg.setAttribute("role", "status");
+    msg.setAttribute("aria-live", "polite");
 
     const msgBody = document.createElement("div");
-    msgBody.style.maxWidth = "520px";
+    msgBody.className = "sp-empty-state-card";
 
     const msgTitle = document.createElement("div");
-    Object.assign(msgTitle.style, {
-      fontWeight: "800",
-      fontSize: "16px",
-      marginBottom: "6px"
-    } as CSSStyleDeclaration);
-    msgTitle.textContent = "SVG nao configurado";
+    msgTitle.className = "sp-empty-state-title";
+    msgTitle.textContent = "Nenhum mapa configurado";
 
     const msgText = document.createElement("div");
-    Object.assign(msgText.style, {
-      opacity: ".85",
-      fontSize: "13px",
-      lineHeight: "1.35"
-    } as CSSStyleDeclaration);
-    msgText.appendChild(document.createTextNode("Abra o relatorio no "));
-    const msgStrong = document.createElement("span");
-    msgStrong.style.fontWeight = "700";
-    msgStrong.textContent = "Power BI Desktop";
-    msgText.appendChild(msgStrong);
-    msgText.appendChild(document.createTextNode(" para selecionar/configurar o SVG deste visual."));
+    msgText.className = "sp-empty-state-body";
+    if (this.canShowAuthoringControls(options)) {
+      msgText.textContent = this.canPersistAuthoringProperties(options)
+        ? "Adicione um mapa SVG para configurar este visual."
+        : "O host atual nao permite salvar configuracoes. Entre no modo de edicao para configurar o mapa.";
+    } else {
+      msgText.textContent = "Este visual precisa de um mapa SVG configurado pelo autor do relatorio.";
+    }
 
     msgBody.appendChild(msgTitle);
     msgBody.appendChild(msgText);
+    if (this.canPersistAuthoringProperties(options)) {
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "sp-empty-state-action";
+      action.textContent = "Adicionar Mapa";
+      action.addEventListener("click", () => {
+        if (!this.canPersistAuthoringProperties(this.lastUpdateOptions)) return;
+        this.fileInput.click();
+      });
+      msgBody.appendChild(action);
+    }
     msg.appendChild(msgBody);
     this.container.appendChild(msg);
   }
@@ -3640,7 +3703,7 @@ export class Visual implements IVisual {
     if (this.svgHost && !preserveDrillFocus) {
       this.svgHost.querySelectorAll("svg").forEach((el) => el.remove());
     }
-    this.container.querySelectorAll(".sp-no-svg-msg").forEach((e) => e.remove());
+    this.container.querySelectorAll(".sp-empty-state, .sp-no-svg-msg").forEach((e) => e.remove());
     this.helpManualOpen = false;
     if (this.helpEl) this.helpEl.style.display = "none";
     this.setSanitizationWarning(null, null);
@@ -4466,11 +4529,6 @@ export class Visual implements IVisual {
     if (this.legendHost) this.legendHost.style.color = palette.foreground;
   }
 
-  private isAdvancedEditMode(options?: VisualUpdateOptions): boolean {
-    const editMode = (options as any)?.editMode;
-    return editMode === 1 || editMode === "Advanced" || String(editMode ?? "").toLowerCase() === "advanced";
-  }
-
   private getCategoryColumns(dv?: DataView): DataViewCategoryColumn[] {
     const cat = dv?.categorical as DataViewCategorical | undefined;
     return getConfiguredCategoryColumnsFromState(cat?.categories ?? []) as DataViewCategoryColumn[];
@@ -4546,10 +4604,10 @@ export class Visual implements IVisual {
     const cached = this.svgAreaIdCache.get(key);
     if (cached) return cached;
 
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(decodeSvgDataUri(svgText), "image/svg+xml");
+    const sanitized = this.getSanitizedSvgFromCache(svgText);
+    const root = sanitized.svg;
     const ids = new Set<string>();
-    doc.querySelectorAll("[id]").forEach((el) => {
+    root?.querySelectorAll("[id]").forEach((el) => {
       if (el.closest("defs, pattern, clipPath, mask, marker, symbol")) return;
       if (!this.isRenderableAreaElement(el)) return;
       const id = norm(el.getAttribute("id") || "");
@@ -4576,6 +4634,85 @@ export class Visual implements IVisual {
       if (ids.has(value)) matches += 1;
     });
     return matches / uniqueValues.size;
+  }
+
+  private getSvgCacheSignature(svgTextRaw: string): { signature: string; decoded: string } {
+    const decoded = decodeSvgDataUri(svgTextRaw);
+    return {
+      signature: `${hashString(decoded)}_${decoded.length}`,
+      decoded
+    };
+  }
+
+  private rememberSanitizedSvg(signature: string, entry: SanitizedSvgCacheEntry): void {
+    if (this.svgSanitizationCache.has(signature)) {
+      this.svgSanitizationCache.delete(signature);
+    }
+    this.svgSanitizationCache.set(signature, entry);
+    while (this.svgSanitizationCache.size > this.maxSvgSanitizationCacheEntries) {
+      const oldest = this.svgSanitizationCache.keys().next().value;
+      if (!oldest) break;
+      this.svgSanitizationCache.delete(oldest);
+    }
+  }
+
+  private getSanitizedSvgFromCache(svgTextRaw: string): SanitizedSvgCacheEntry {
+    const { signature, decoded } = this.getSvgCacheSignature(svgTextRaw);
+    const cached = this.svgSanitizationCache.get(signature);
+    if (cached) {
+      this.svgSanitizationCache.delete(signature);
+      this.svgSanitizationCache.set(signature, cached);
+      return cached;
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(decoded, "image/svg+xml");
+    const { svg, report } = sanitizeSvgDocument(doc);
+    const entry: SanitizedSvgCacheEntry = { signature, svg, report };
+    this.rememberSanitizedSvg(signature, entry);
+    return entry;
+  }
+
+  private prewarmManifestSvgCache(manifest: MapRegistryManifest, activeMapId?: string | null): void {
+    const next = manifest.maps
+      .filter((map) => map.mapId !== activeMapId)
+      .map((map) => (map.svgText || "").trim())
+      .filter((svgText) => !!svgText)
+      .filter((svgText) => !this.svgSanitizationCache.has(this.getSvgCacheSignature(svgText).signature));
+    if (next.length === 0) return;
+
+    this.svgPrewarmQueue.push(...next);
+    if (this.svgPrewarmScheduled) return;
+    this.svgPrewarmScheduled = true;
+
+    const run = () => {
+      this.svgPrewarmScheduled = false;
+      const started = Date.now();
+      while (this.svgPrewarmQueue.length > 0 && Date.now() - started < 12) {
+        const svgText = this.svgPrewarmQueue.shift();
+        if (!svgText) continue;
+        try {
+          this.getSanitizedSvgFromCache(svgText);
+        } catch {
+          // Invalid SVGs are handled by normal render validation.
+        }
+      }
+      if (this.svgPrewarmQueue.length > 0) {
+        this.svgPrewarmScheduled = true;
+        this.scheduleSvgPrewarm(run);
+      }
+    };
+
+    this.scheduleSvgPrewarm(run);
+  }
+
+  private scheduleSvgPrewarm(callback: () => void): void {
+    const requestIdle = (window as any)?.requestIdleCallback;
+    if (typeof requestIdle === "function") {
+      requestIdle(callback, { timeout: 250 });
+      return;
+    }
+    window.setTimeout(callback, 0);
   }
 
   private resolveActiveMapFromDrillPath(defaultSvgText: string, dv?: DataView): ActiveMapResolution {
@@ -4654,6 +4791,7 @@ export class Visual implements IVisual {
         currentLevel,
         categoryFieldNames: currentPath,
         activeCategoryQueryName: this.activeCategoryQueryName,
+        previousMapId: this.activeMap?.mapId || null,
         pendingDrillSource,
         categoryMatchScores,
         requireExplicitDrillPath
@@ -4680,7 +4818,7 @@ export class Visual implements IVisual {
 
     let map = (resolution.map as MapRegistryMap | null) || null;
     let svgText = (map?.svgText || "").trim();
-    if (!svgText && resolution.reason === "none" && currentLevel > 0) {
+    if (!svgText && resolution.reason === "none" && currentLevel > 0 && navDirection !== "up") {
       const currentMapSvg = (this.activeMap?.map?.svgText || "").trim();
       if (this.activeMap?.map && currentMapSvg) {
         map = this.activeMap.map;
@@ -5198,7 +5336,15 @@ export class Visual implements IVisual {
 
       const meta = document.createElement("div");
       meta.className = "sp-editor-map-item-meta";
-      meta.textContent = `${map.mapId}${workingState.manifest.defaultMapId === map.mapId ? " • padrao" : ""}`;
+      meta.textContent = map.mapId;
+      if (workingState.manifest.defaultMapId === map.mapId) {
+        const rootBadge = document.createElement("span");
+        rootBadge.className = "sp-editor-map-root-badge";
+        rootBadge.textContent = "Padrão";
+        rootBadge.title = "Mapa raiz padrão";
+        meta.appendChild(document.createTextNode(" "));
+        meta.appendChild(rootBadge);
+      }
 
       item.append(name, meta);
       item.addEventListener("click", () => {
@@ -5249,15 +5395,19 @@ export class Visual implements IVisual {
     const addInput = document.createElement("input");
     addInput.type = "file";
     addInput.accept = ".svg,image/svg+xml";
+    addInput.multiple = true;
     addInput.style.display = "none";
     addInput.addEventListener("change", async () => {
-      const file = addInput.files?.[0];
-      if (!file) return;
+      const files = Array.from(addInput.files || []).filter((file) => /\.svg$/i.test(file.name) || file.type === "image/svg+xml");
+      if (files.length === 0) return;
       const current = actions.captureState();
       this.applyEditorDraftState(current.manifest, current.labelOverrides, current.activeMap.mapId, this.editorSelectedAreaId, this.editorViewMode);
-      const text = await file.text();
-      const dataUri = "data:image/svg+xml;utf8," + encodeURIComponent(text);
-      this.seedDraftFromUploadedSvg(dataUri, file.name, true);
+      for (const file of files) {
+        const text = await file.text();
+        const dataUri = "data:image/svg+xml;utf8," + encodeURIComponent(text);
+        this.seedDraftFromUploadedSvg(dataUri, file.name, true);
+      }
+      this.setEditorStatus(`${files.length} mapa${files.length === 1 ? "" : "s"} adicionado${files.length === 1 ? "" : "s"} a partir de SVG.`, false);
       addInput.value = "";
       actions.rerender();
     });
@@ -5716,7 +5866,7 @@ export class Visual implements IVisual {
       manifest.maps = [
         {
           mapId: this.activeMap.mapId || "default",
-          name: "Mapa principal",
+          name: this.activeMap.map?.name || this.activeMap.mapId || "Padrão",
           svgText: this.activeMap.svgText || this.settings.svgSettings.svgText,
           level: 0,
           drillPath: [],
@@ -6074,7 +6224,7 @@ export class Visual implements IVisual {
     const activeMapId = this.editorSelectedMapId || manifest.defaultMapId || fallbackActiveMapId || manifest.maps[0]?.mapId || "default";
     const activeMap = manifest.maps.find((map) => map.mapId === activeMapId) || manifest.maps[0];
     if (!activeMap) {
-      manifest.maps.push({ mapId: "default", name: "Mapa principal", svgText: this.settings.svgSettings.svgText, areas: {} });
+      manifest.maps.push({ mapId: "default", name: "Padrão", svgText: this.settings.svgSettings.svgText, areas: {} });
     }
     const currentMap = manifest.maps.find((map) => map.mapId === activeMapId) || manifest.maps[0];
     currentMap.areas = currentMap.areas || {};
@@ -6201,6 +6351,7 @@ export class Visual implements IVisual {
   public update(options: VisualUpdateOptions) {
     const eventService = (this.host as any)?.eventService as IVisualEventService | undefined;
     eventService?.renderingStarted(options);
+    this.updateHostMode(options);
     this.lastUpdateOptions = options;
 
     let succeeded = false;
@@ -6241,8 +6392,7 @@ export class Visual implements IVisual {
         this.cancelPendingDrillFocus();
       }
 
-      this.setUploadUIVisibility(hasSvg);
-      this.setEditorButtonVisibility(hasSvg, options);
+      this.syncAuthoringUiVisibility(hasSvg, options);
 
       const warningShow = !!this.settings?.warning?.show;
       this.warningForceShow = false;
@@ -6256,14 +6406,11 @@ export class Visual implements IVisual {
       this.lastWarningShow = warningShow;
 
       if (!hasSvg) {
-        if (this.canShowSvgPickerUI()) {
-          this.clearSvg();
-        } else {
-          this.showNoSvgMessageOutsideDesktop();
-        }
+        this.renderNoMapState(hasSvg, options);
         this.setSanitizationWarning(null, null);
       } else {
         this.render(svgText, dv);
+        this.prewarmManifestSvgCache(this.activeMap.manifest, this.activeMap.mapId);
       }
 
       this.updateLegend(dv, hasSvg);
@@ -6526,24 +6673,16 @@ export class Visual implements IVisual {
 
   // ===== render =====
   private render(svgTextRaw: string, dv?: DataView) {
-    const svgText = decodeSvgDataUri(svgTextRaw);
-    const svgSig = `${hashString(svgText)}_${svgText.length}`;
+    const { signature: svgSig } = this.getSvgCacheSignature(svgTextRaw);
+    const { svg: cachedSvg, report } = this.getSanitizedSvgFromCache(svgTextRaw);
 
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgText, "image/svg+xml");
-
-    const { svg: parsed, report } = sanitizeSvgDocument(doc);
-
-    if (!parsed) {
-      if (this.canShowSvgPickerUI()) {
-        this.clearSvg();
-        return;
-      }
-      this.showNoSvgMessageOutsideDesktop();
+    if (!cachedSvg) {
+      this.renderNoMapState(false, this.lastUpdateOptions);
       this.setSanitizationWarning(null, null);
       return;
     }
 
+    const parsed = document.importNode(cachedSvg, true) as SVGSVGElement;
     const pruneResult = this.pruneSvgToDrillDataScope(parsed);
     const renderSig = `${svgSig}_${this.getDrillSvgScopeSignature(pruneResult)}`;
 
@@ -6561,7 +6700,7 @@ export class Visual implements IVisual {
     this.clearSvg(this.pendingDrillFocus);
     this.setSanitizationWarning(report, svgSig, this.warningForceShow);
 
-    const svgNode = document.importNode(parsed, true) as SVGSVGElement;
+    const svgNode = parsed;
     const widthAttr = svgNode.getAttribute("width");
     const heightAttr = svgNode.getAttribute("height");
 

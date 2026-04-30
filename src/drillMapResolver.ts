@@ -33,6 +33,7 @@ export type DrillMapContext = {
   currentLevel: number;
   categoryFieldNames: string[];
   activeCategoryQueryName?: string | null;
+  previousMapId?: string | null;
   pendingDrillSource?: PendingDrillSource | null;
   categoryMatchScores?: Record<string, { score: number; categoryName?: string | null }>;
   requireExplicitDrillPath?: boolean;
@@ -47,6 +48,7 @@ export type DrillMapResolutionReason =
   | "areaOverride"
   | "drillPath"
   | "level"
+  | "parentEdge"
   | "automatch"
   | "default"
   | "none";
@@ -269,6 +271,10 @@ export function resolveDrillMap(
     return finish(options.fallbackToDefaultMap ? defaultMap : null, options.fallbackToDefaultMap ? "default" : "none");
   }
 
+  if (context.currentLevel === 0 && defaultMap && hasSvg(defaultMap)) {
+    return finish(defaultMap, "default");
+  }
+
   const pending = context.pendingDrillSource;
   if (pending?.targetMapId && isPendingSourceForAdvancedLevel(context)) {
     const overrideMap = manifest.maps.find((map) => map.mapId === pending.targetMapId) || null;
@@ -312,6 +318,40 @@ export function resolveDrillMap(
         ? [`Mais de um mapa corresponde ao drillPath atual; usando ${exactPathMatches[0].mapId}.`]
         : []
     );
+  }
+
+  const previousMapId = context.previousMapId || "";
+  if (previousMapId && context.currentLevel > 0) {
+    const parentEdgeMatches = manifest.maps
+      .filter((map) => {
+        if (!hasSvg(map) || map.mapId === previousMapId) return false;
+        return Object.values(map.areas || {}).some((area) => area?.drillToMapId === previousMapId);
+      })
+      .map((map) => ({
+        map,
+        score: context.categoryMatchScores?.[map.mapId]?.score ?? 0
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    if (parentEdgeMatches.length === 1) {
+      return finish(parentEdgeMatches[0].map, "parentEdge");
+    }
+    if (parentEdgeMatches.length > 1) {
+      const best = parentEdgeMatches[0];
+      const second = parentEdgeMatches[1];
+      if (best.score > 0 && best.score > second.score) {
+        return finish(
+          best.map,
+          "parentEdge",
+          [`Drill up encontrou multiplos mapas pai para ${previousMapId}; usando ${best.map.mapId} por correspondencia com os dados atuais.`]
+        );
+      }
+      return finish(
+        parentEdgeMatches[0].map,
+        "parentEdge",
+        [`Drill up encontrou multiplos mapas pai para ${previousMapId}; usando ${parentEdgeMatches[0].map.mapId}.`]
+      );
+    }
   }
 
   if (context.requireExplicitDrillPath) {

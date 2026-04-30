@@ -1,7 +1,7 @@
 {
   "name": "sigfarm-geosynoptic",
   "description": "Power BI custom visual for SVG synoptic maps with theme colors, conditional fills, labels, drill-aware map registry, and certified-safe SVG sanitization.",
-  "version": "1.0.0.13",
+  "version": "1.0.0.14",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Omarques2/sigfarmSynoptic.git"

@@ -1,4 +1,8 @@
 node_modules/
+.env
+.env.*
+*.pem
+*.key
 .tmp/
 dist/
 tmp_pbiviz*/
@@ -7,4 +11,5 @@ webpack.statistics*.html
 .platform/
 cache.abf
 samples/_pbiviz_extract/
+samples/.pbip/
 synopticPanel.zip

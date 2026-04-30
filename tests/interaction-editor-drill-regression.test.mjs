@@ -93,15 +93,15 @@ assert(/overflow:\s*"hidden"/.test(visualTs), "o host do editor deve evitar scro
 assert(/openModalDialog/.test(visualTs), "visual.ts deve usar o modal oficial do Power BI quando suportado.");
 assert(/allowModalDialog/.test(visualTs), "visual.ts deve respeitar a capability allowModalDialog do host.");
 assert(/MapEditorDialog/.test(visualTs), "visual.ts deve integrar o dialogo do editor de mapas.");
-assert(/allowMapUploads:\s*this\.canShowSvgPickerUI\(\)/.test(visualTs), "o dialogo deve receber a flag de upload permitido apenas no Desktop.");
+assert(/allowMapUploads:\s*this\.canShowAuthoringControls\(this\.lastUpdateOptions\)/.test(visualTs), "o dialogo deve permitir upload em modo de autoria no Desktop e Power BI Service.");
 assert(/canExposeEditorUi/.test(visualTs), "visual deve centralizar regra de exposicao do editor.");
 assert(/canShowEditorButton/.test(visualTs), "visual deve centralizar regra de visibilidade do botao Editor.");
 const canExposeEditorStart = visualTs.indexOf("private canExposeEditorUi");
 const canExposeEditorEnd = visualTs.indexOf("private canShowEditorButton", canExposeEditorStart);
 const canExposeEditorBody = visualTs.slice(canExposeEditorStart, canExposeEditorEnd);
-assert(/canShowSvgPickerUI\(\)/.test(canExposeEditorBody), "botao Editor deve continuar bloqueado fora do Desktop.");
-assert(!/isAdvancedEditMode/.test(canExposeEditorBody), "botao Editor deve aparecer no Desktop normal; Advanced Edit nao deve ser exigido para o botao.");
-assert(/setEditorButtonVisibility\(hasSvgConfigured: boolean,\s*options\?: VisualUpdateOptions/.test(visualTs), "visibilidade do botao Editor deve receber options.");
+assert(!/canShowSvgPickerUI\(\)/.test(canExposeEditorBody), "botao Editor nao deve ser bloqueado fora do Desktop.");
+assert(/canShowAuthoringControls/.test(canExposeEditorBody), "botao Editor deve usar o modo nativo de autoria do Power BI.");
+assert(/syncAuthoringUiVisibility\(hasSvgConfigured: boolean,\s*options\?: VisualUpdateOptions/.test(visualTs), "visibilidade dos controles de autoria deve receber options.");
 assert(/tabIndex\s*=\s*show \? 0 : -1/.test(visualTs), "botao Editor oculto nao deve ser focavel.");
 assert(/aria-hidden/.test(visualTs), "botao Editor deve atualizar aria-hidden.");
 assert(!/right:\s*"110px"/.test(visualTs), "botao Editor nao deve ficar no canto superior direito.");
@@ -112,6 +112,10 @@ assert(/dialogRegistry/.test(dialogTs), "MapEditorDialog.ts deve registrar o dia
 assert(/class\s+MapEditorDialog\b/.test(dialogTs), "MapEditorDialog.ts deve exportar a classe do dialogo.");
 assert(/createButton\(/.test(dialogTs) && /createIcon\(/.test(dialogTs), "MapEditorDialog.ts deve montar botoes compactos com icones inline.");
 assert(/buildSvgEditorOverlay/.test(dialogTs), "MapEditorDialog.ts deve oferecer overlay interno para editar o SVG.");
+assert(/Tornar Mapa Raiz/.test(dialogTs), "Menu de mapas deve permitir tornar um mapa existente como raiz.");
+assert(/manifest\.defaultMapId\s*=\s*map\.mapId/.test(dialogTs), "Acao Tornar Mapa Raiz deve atualizar defaultMapId.");
+assert(!/name:\s*"Mapa principal"/.test(visualTs), "visual nao deve renomear mapas automaticamente para Mapa principal.");
+assert(/sp-editor-map-root-badge/.test(visualTs) && /sp-editor-map-root-badge::before/.test(visualLess), "mapa raiz deve ser indicado por badge/icone, sem renomear o mapa.");
 assert(/createButton\("SVG", "svg"/.test(dialogTs), "a tela detalhada deve expor um botao SVG.");
 const detailViewStart = dialogTs.indexOf("private buildDetailView");
 const detailViewEnd = dialogTs.indexOf("const main = document.createElement", detailViewStart);
@@ -462,8 +466,11 @@ assert(/applyLocalRowSelection/.test(visualTs), "visual deve aplicar selecao loc
 assert(/canHostDrillControls/.test(visualTs), "visual deve separar controles nativos de drill da permissao de drilldown por clique.");
 assert(/canHostDrillUp/.test(visualTs), "visual deve rastrear drill up para manter controles nativos em niveis profundos.");
 assert(/lastSetCanDrillValue/.test(visualTs), "visual deve evitar chamadas repetidas desnecessarias a setCanDrill.");
+assert(/svgSanitizationCache/.test(visualTs), "visual deve manter cache de SVG sanitizado para reduzir latencia no primeiro drill.");
+assert(/prewarmManifestSvgCache/.test(visualTs), "visual deve preaquecer SVGs do manifesto apos resolver o mapa ativo.");
+assert(/getSanitizedSvgFromCache/.test(visualTs), "render deve reutilizar SVG sanitizado em vez de parsear tudo em cada drill.");
 assert(/getCurrentResolvedLevel/.test(visualTs), "visual deve usar nivel resolvido por path e mapa ativo.");
-assert(/activeMapHasExplicitNextDrillTarget/.test(visualTs), "visual deve detectar se mapa ativo tem proximo drill explicito.");
+assert(/activeMapCanAdvanceDrill/.test(visualTs), "visual deve detectar se mapa ativo pode avançar drill com destino manual ou automatico.");
 assert(/setCanDrill\.call\(this\.host,\s*shouldEnableDrillControls\)/.test(visualTs), "setCanDrill deve receber estado dos controles nativos, nao apenas canDrillDown.");
 assert(!/const canDrillDown\s*=\s*!isDrillDisabled\s*&&/.test(visualTs), "isDrillDisabled nao pode impedir reabilitar drill via setCanDrill(true).");
 assert(!/setCanDrill\.call\(this\.host,\s*canDrillDown\)/.test(visualTs), "setCanDrill nao deve usar canDrillDown direto.");
@@ -537,8 +544,8 @@ assert(/shouldPruneSvgToDrillDataScope\(\): boolean \{[\s\S]{0,420}noDataBehavio
 assert(/computeRenderScope\(\): RenderScopeState \{[\s\S]{0,520}noDataBehavior === "Hide"/.test(visualTs), "renderScope nao deve esconder areas sem dado quando noDataBehavior for Fade.");
 assert(/getDrillSvgScopeSignature/.test(visualTs), "visual.ts deve incluir escopo de drill na assinatura do SVG renderizado.");
 const pruneCallIndex = visualTs.indexOf("const pruneResult = this.pruneSvgToDrillDataScope(parsed);");
-const importNodeIndex = visualTs.indexOf("document.importNode(parsed, true)");
-assert(pruneCallIndex >= 0 && importNodeIndex > pruneCallIndex, "render deve podar areas fora do drill antes de importar o SVG para o DOM.");
+const svgNodeIndex = visualTs.indexOf("const svgNode = parsed;");
+assert(pruneCallIndex >= 0 && svgNodeIndex > pruneCallIndex, "render deve podar areas fora do drill antes de inserir o SVG no DOM.");
 assert(/this\.lastRenderedSvgSignature === renderSig/.test(visualTs), "reuso estrutural do SVG deve considerar a assinatura com escopo filtrado.");
 assert(/isHiddenByRenderScope/.test(visualTs), "visual.ts deve ocultar areas fora do escopo do drill.");
 assert(/this\.renderScope\.spatialOutlierIds\.has\(id\)/.test(visualTs), "areas outliers do drill devem ser ocultadas pelo renderScope.");
@@ -638,7 +645,7 @@ assert(/private getEffectiveCategoryColumns\(dv\?: DataView\): DataViewCategoryC
 assert(/private getEffectiveCurrentLevel\(dv\?: DataView\): number/.test(visualTs), "visual deve expor helper de nivel efetivo.");
 assert(/private getEffectiveCurrentCategory\(dv\?: DataView\): DataViewCategoryColumn \| null/.test(visualTs), "visual deve resolver categoria efetiva atual.");
 assert(/if \(!this\.canHostDrillDown\) return null;/.test(visualTs), "visual nao deve criar rota de drill quando o drill nativo do Power BI esta desligado.");
-assert(/const hostReportsDrillDown\s*=[\s\S]{0,220}drillTypes\.includes\(2\)/.test(visualTs), "visual deve ler drillableRoles do host para saber quando drill down esta disponivel.");
+assert(/const hostReportsDrillDown\s*=[\s\S]{0,260}drillTypes\.includes\(2\)[\s\S]{0,260}hasHierarchyConfigured[\s\S]{0,260}activeMapCanAdvance/.test(visualTs), "visual deve aceitar drill down quando o Service ainda nao reportou drillableRoles, mas ha hierarquia e mapa avancavel.");
 assert(/const shouldEnableDrillControls\s*=[\s\S]{0,260}this\.canHostDrillUp[\s\S]{0,260}this\.canHostDrillDown/.test(visualTs), "controles nativos devem continuar habilitados em niveis profundos para preservar drill up.");
 assert(/currentLevel > 0/.test(visualTs), "visual deve manter controles de drill quando esta dentro da hierarquia.");
 assert(/const configuredCategoryCount = this\.getCategoryColumns\(dv\)\.length;[\s\S]{0,220}const effectiveCategoryCount = this\.getEffectiveCategoryColumns\(dv\)\.length;/.test(visualTs), "estado de drill do host deve diferenciar colunas configuradas de colunas efetivamente ativas.");
@@ -656,6 +663,12 @@ const potentialDrillClickBody = visualTs.slice(
 );
 assert(!/applySelectionVisualState\(/.test(potentialDrillClickBody), "timer de clique candidato a drill nao deve reaplicar foco local no nivel anterior.");
 assert(/flushPotentialDrillSelection/.test(visualTs), "selecao candidata a drill deve poder ser aplicada cedo quando o host nao troca de nivel.");
+const flushPotentialBody = visualTs.slice(
+  visualTs.indexOf("private flushPotentialDrillSelection"),
+  visualTs.indexOf("private armPotentialDrillClickTransition", visualTs.indexOf("private flushPotentialDrillSelection"))
+);
+assert(!/clearPotentialDrillClickState\(true\)[\s\S]{0,180}this\.setSelectionFromIds/.test(flushPotentialBody), "fallback visual de selecao nao deve limpar pendingDrillSource antes do update de drill do Service.");
+assert(/potentialDrillFocusSuppressionMs = 6000/.test(visualTs), "Service pode demorar no primeiro drill; pendingDrillSource deve sobreviver alem do fallback visual curto.");
 const selectRowBody = visualTs.slice(
   visualTs.indexOf("private selectRow("),
   visualTs.indexOf("private selectRows(")

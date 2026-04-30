@@ -119,6 +119,28 @@ try {
 
   {
     const maps = [
+      { mapId: "first_added", name: "Primeiro adicionado", level: 0, svgText: "<svg><path id='SP'/></svg>" },
+      { mapId: "chosen_root", name: "Mapa raiz escolhido", level: 0, svgText: "<svg><path id='MG'/></svg>" }
+    ];
+    const result = resolveDrillMap(
+      { defaultMapId: "chosen_root", maps },
+      {
+        currentDrillPath: ["Estado"],
+        currentLevel: 0,
+        categoryFieldNames: ["Estado"],
+        categoryMatchScores: {
+          first_added: { score: 100, categoryName: "Estado" },
+          chosen_root: { score: 1, categoryName: "Estado" }
+        }
+      },
+      options
+    );
+    assert.equal(result.mapId, "chosen_root");
+    assert.equal(result.reason, "default");
+  }
+
+  {
+    const maps = [
       {
         mapId: "estados",
         name: "Estados",
@@ -424,6 +446,64 @@ try {
     assert.equal(unresolved.mapId, null);
     assert.equal(unresolved.reason, "none");
     assert.notEqual(unresolved.mapId, "default");
+  }
+
+  {
+    const maps = [
+      {
+        mapId: "default",
+        level: 0,
+        svgText: "<svg><path id='GO'/><path id='MG'/></svg>",
+        areas: {
+          GO: { drillMode: "manual", drillToMapId: "brasil_municipios_go" },
+          MG: { drillMode: "manual", drillToMapId: "brasil_municipios_mg" }
+        }
+      },
+      {
+        mapId: "brasil_municipios_go",
+        svgText: "<svg><path id='Goiânia_GO'/><path id='Anápolis_GO'/></svg>",
+        areas: {
+          Goiânia_GO: { drillMode: "manual", drillToMapId: "goiania_go_bairros" }
+        }
+      },
+      {
+        mapId: "brasil_municipios_mg",
+        svgText: "<svg><path id='Planura_MG'/><path id='Conceição_das_Alagoas_MG'/></svg>",
+        areas: {
+          Planura_MG: { drillMode: "manual", drillToMapId: "planura_mg_bairros" }
+        }
+      },
+      {
+        mapId: "goiania_go_bairros",
+        svgText: "<svg><path id='Centro_Goiânia_GO'/></svg>"
+      },
+      {
+        mapId: "planura_mg_bairros",
+        svgText: "<svg><path id='Centro_Planura_MG'/></svg>"
+      }
+    ];
+
+    const result = resolveDrillMap(
+      { defaultMapId: "default", maps },
+      {
+        currentDrillPath: ["Estado", "Municipio"],
+        currentDrillValuePath: ["GO"],
+        currentLevel: 1,
+        categoryFieldNames: ["Estado", "Municipio"],
+        previousMapId: "goiania_go_bairros",
+        requireExplicitDrillPath: true,
+        categoryMatchScores: {
+          brasil_municipios_go: { score: 1, categoryName: "Municipio" },
+          brasil_municipios_mg: { score: 0, categoryName: "Municipio" },
+          goiania_go_bairros: { score: 0, categoryName: "Municipio" }
+        }
+      },
+      options
+    );
+
+    assert.equal(result.mapId, "brasil_municipios_go");
+    assert.equal(result.reason, "parentEdge");
+    assert.notEqual(result.mapId, "goiania_go_bairros");
   }
 
   {

@@ -1265,16 +1265,24 @@ class MapEditorDialogApp {
     return frame;
   }
 
-  private createHiddenFileInput(accept: string, onRead: (text: string, fileName: string) => void): HTMLInputElement {
+  private createHiddenFileInput(
+    accept: string,
+    onRead: (text: string, fileName: string) => void,
+    multiple: boolean = false
+  ): HTMLInputElement {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = accept;
+    input.multiple = multiple;
     input.style.display = "none";
     input.addEventListener("change", async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const text = await file.text();
-      onRead(text, file.name);
+      const files = Array.from(input.files || []).filter((file) => /\.svg$/i.test(file.name) || file.type === "image/svg+xml");
+      if (files.length === 0) return;
+      for (const file of files) {
+        const text = await file.text();
+        onRead(text, file.name);
+        if (!multiple) break;
+      }
       input.value = "";
     });
     return input;
@@ -3838,6 +3846,26 @@ class MapEditorDialogApp {
       this.render();
     });
 
+    const makeRootBtn = document.createElement("button");
+    makeRootBtn.type = "button";
+    makeRootBtn.className = "sp-editor-map-action-menu-item";
+    makeRootBtn.textContent = "Tornar Mapa Raiz";
+    makeRootBtn.disabled = this.manifest.defaultMapId === map.mapId;
+    makeRootBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.applyCurrentInputs(shell);
+      this.manifest.defaultMapId = map.mapId;
+      this.selectedMapId = map.mapId;
+      this.selectedAreaId = null;
+      this.openMapActionMenuId = null;
+      this.renamingMapId = null;
+      this.statusMessage = "Mapa raiz atualizado.";
+      this.statusError = false;
+      this.syncResult(true);
+      this.render();
+    });
+
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
     deleteBtn.className = "sp-editor-map-action-menu-item is-danger";
@@ -3849,7 +3877,7 @@ class MapEditorDialogApp {
       this.deleteMapById(map.mapId);
     });
 
-    menu.append(renameBtn, deleteBtn);
+    menu.append(renameBtn, makeRootBtn, deleteBtn);
     return menu;
   }
 
@@ -4080,7 +4108,7 @@ class MapEditorDialogApp {
         this.setStatus("Mapa adicionado a partir do arquivo SVG.", false);
       }
       this.render();
-    });
+    }, true);
 
     const sidebarActions = document.createElement("div");
     sidebarActions.className = "sp-editor-browser-sidebar-actions";
